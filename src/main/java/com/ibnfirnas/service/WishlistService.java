@@ -22,6 +22,7 @@ public class WishlistService {
         return wishlistRepository.findByUserId(user.getId());
     }
 
+    @Transactional
     public Wishlist addToWishlist(Long productId, String email) {
         User user = getUser(email);
         if (wishlistRepository.existsByUserIdAndProductId(user.getId(), productId)) {
