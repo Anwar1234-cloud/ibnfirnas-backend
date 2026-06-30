@@ -1,5 +1,6 @@
 package com.ibnfirnas.service;
 
+import com.ibnfirnas.dto.response.WishlistResponse;
 import com.ibnfirnas.entity.*;
 import com.ibnfirnas.exception.BadRequestException;
 import com.ibnfirnas.exception.ResourceNotFoundException;
@@ -48,5 +49,19 @@ public class WishlistService {
     private User getUser(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+
+    // Add this private method inside WishlistService
+
+    private WishlistResponse toResponse(Wishlist wishlist) {
+        return WishlistResponse.builder()
+                .id(wishlist.getId())
+                .productId(wishlist.getProduct().getId())
+                .productName(wishlist.getProduct().getName())
+                .productImageUrl(wishlist.getProduct().getImageUrl())
+                .productPrice(wishlist.getProduct().getPrice())
+                .addedAt(wishlist.getCreatedAt())
+                .build();
     }
 }
