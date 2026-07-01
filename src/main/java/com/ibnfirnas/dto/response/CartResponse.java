@@ -8,22 +8,18 @@ import java.util.List;
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
 @Builder
-public class OrderResponse {
+public class CartResponse {
     private Long id;
-    private String orderNumber;
-    private BigDecimal totalAmount;
-    private String status;
-    private String paymentStatus;
-    private String shippingAddress;
-    private String paymentMethod;
-    private String trackingNumber;
-    private List<OrderItemResponse> items;
-    private LocalDateTime createdAt;
+    private Integer totalItems;
+    private BigDecimal subtotal;
+    private BigDecimal total;
+    private List<CartItemResponse> items;
+    private LocalDateTime updatedAt;
 
     @Getter @Setter
     @NoArgsConstructor @AllArgsConstructor
     @Builder
-    public static class OrderItemResponse {
+    public static class CartItemResponse {
         private Long id;
         private Long productId;
         private String productName;
