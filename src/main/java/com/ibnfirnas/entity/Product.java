@@ -73,7 +73,7 @@ public class Product {
     @Column(name = "total_reviews")
     private Integer totalReviews = 0;
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<ProductImage> images;
 
     @CreationTimestamp

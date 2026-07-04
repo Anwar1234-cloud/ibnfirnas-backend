@@ -36,7 +36,7 @@ public class Cart {
     @Column(precision = 10, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
-    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL,fetch = FetchType.EAGER)
     private List<CartItem> items;
 
     @CreationTimestamp
