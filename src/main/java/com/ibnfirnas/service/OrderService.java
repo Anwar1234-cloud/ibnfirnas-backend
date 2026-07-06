@@ -139,4 +139,10 @@ public class OrderService {
         order.setStatus(status);
         return toDTO(orderRepository.save(order));
     }
+
+    public List<OrderResponse> getAllOrders() {
+        return orderRepository.findAll()
+                .stream().map(this::toDTO)
+                .collect(Collectors.toList());
+    }
 }

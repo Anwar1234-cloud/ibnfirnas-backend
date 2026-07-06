@@ -50,4 +50,9 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success("Status updated",
                 orderService.updateOrderStatus(id, status)));
     }
+    @GetMapping("/all")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> getAllOrders() {
+        return ResponseEntity.ok(ApiResponse.success("All orders",
+                orderService.getAllOrders()));
+    }
 }
