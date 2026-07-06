@@ -38,4 +38,9 @@ public class GalleryController {
         return ResponseEntity.ok(ApiResponse.success("Gallery item added",
                 galleryRepository.save(gallery)));
     }
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        galleryRepository.deleteById(id);
+        return ResponseEntity.ok(ApiResponse.success("Deleted", null));
+    }
 }
