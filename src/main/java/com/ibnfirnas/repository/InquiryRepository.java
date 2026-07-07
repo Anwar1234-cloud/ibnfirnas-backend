@@ -8,4 +8,5 @@ import java.util.List;
 public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
     List<Inquiry> findByUserId(Long userId);
     List<Inquiry> findByStatus(InquiryStatus status);
+    long countByStatus(InquiryStatus status);
 }
