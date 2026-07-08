@@ -1,5 +1,6 @@
 package com.ibnfirnas.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.ibnfirnas.entity.enums.OrderStatus;
 import com.ibnfirnas.entity.enums.PaymentStatus;
 import jakarta.persistence.*;
@@ -53,6 +54,7 @@ public class Order {
     private String notes;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @JsonIgnoreProperties({"order"})
     private List<OrderItem> items;
 
     @CreationTimestamp

@@ -1,5 +1,6 @@
 package com.ibnfirnas.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -23,6 +24,7 @@ public class Category {
     private Category parent;
 
     @OneToMany(mappedBy = "parent", fetch = FetchType.EAGER)
+    @JsonIgnore
     private List<Category> children;
 
     @Column(nullable = false)
