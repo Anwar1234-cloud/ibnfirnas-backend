@@ -1,5 +1,6 @@
 package com.ibnfirnas.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -37,6 +38,7 @@ public class Cart {
     private BigDecimal total = BigDecimal.ZERO;
 
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL,fetch = FetchType.EAGER)
+    @JsonIgnoreProperties({"cart"})
     private List<CartItem> items;
 
     @CreationTimestamp

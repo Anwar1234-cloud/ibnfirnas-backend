@@ -1,9 +1,12 @@
 server:
   port: 8080
 
+
 spring:
   application:
     name: ibnfirnas-backend
+
+
 
   # Database Configuration
   datasource:
@@ -51,6 +54,8 @@ springdoc:
     path: /api-docs
   swagger-ui:
     path: /swagger-ui.html
+  show-actuator: false
+  default-produces-media-type: application/json
 
 # Logging
 logging:
