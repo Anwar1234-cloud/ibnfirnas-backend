@@ -42,6 +42,39 @@ Payment/Notification boxes are drawn for the full architecture but only
 become load-bearing in v1.1 — see [project_context.md](project_context.md)
 for what's actually in v1.
 
+## How the admin panel actually talks to everything
+
+One backend serves both clients — the admin panel does **not** get its
+own backend, and it never talks to the database or to the mobile app
+directly.
+
+```
+Admin panel (browser)          Mobile app (React Native)
+      │  HTTP + JWT                   │  HTTP + JWT
+      └───────────────┬───────────────┘
+                       ▼
+             Spring Boot backend   ← only this layer touches Postgres
+                       │  JDBC / Hibernate
+                       ▼
+                  PostgreSQL
+```
+
+- Same REST endpoints, same `/api/auth/login`, same JWT mechanism for
+  both clients. What makes a request "admin" isn't a separate system —
+  it's that the caller's `User.role` is `ROLE_ADMIN` and `SecurityConfig`
+  gates certain endpoints with `hasRole("ADMIN")` (today, inconsistently
+  — see the security gap section below).
+- Admin panel never holds DB credentials or a JDBC driver. It only knows
+  how to call REST endpoints, same as the mobile app.
+- Admin panel and mobile app never talk to each other directly. An admin
+  creating a product just writes a row to Postgres; the mobile app sees
+  it next time it calls `GET /api/products`. Push notifications (v1.1)
+  route admin → backend → Firebase → device, still no direct channel.
+- `CorsConfig` currently allows `allowedOriginPatterns: ["*"]` — fine for
+  local dev with both frontends on different ports, but should be locked
+  to the actual admin panel and mobile app origins before this goes near
+  production, especially combined with the `permitAll()` gap below.
+
 ## Backend module → v1 requirement cross-check
 
 This is what actually exists in `src/main/java/com/ibnfirnas` today,
@@ -480,10 +513,33 @@ Exist in the codebase, fully working, but called by nothing in the v1
   **Ambiguous — confirm with the client** whether this is v1.1 or dead
   code; it's currently also part of the open `permitAll()` security gap.
 
-None of these need to be deleted — they're harmless sitting dormant — but
-worth an explicit decision with the client rather than silently carrying
-unused surface area (and unused *attack* surface, given the security gap
-applies to some of them too).
+**Decision (2026-07-10): keep all of these.** None get deleted — a
+dormant, unused controller is genuinely harmless (nothing calls it, no
+runtime cost) as long as it *compiles* and doesn't itself have bugs. That
+distinction matters and just came up in practice: `WishlistService` had a
+broken method (`Product.getImageUrl()`, which doesn't exist on `Product`)
+that failed the build for the *entire* repo, even though nothing in v1 or
+v1.1 calls Wishlist — Java compiles everything as one unit, so a bug in
+dormant code still blocks everyone. That method was dead code (nothing
+called it) and got removed; see the changelog below. The Wishlist API
+surface itself (`WishlistController`, `/api/wishlist`) stays.
+
+Two things to keep in mind about "harmless while dormant":
+- **It only stays harmless if it keeps compiling and stays bug-free.**
+  Since nobody's actively building against Cart/Wishlist/Reviews/
+  Newsletter/Order/Notification/Contact/Banner right now, bugs in them
+  can sit unnoticed until they break a build for an unrelated reason
+  (like just happened) — worth a quick sanity check (`mvn compile`)
+  after pulling changes that touch these files.
+- **Dormant doesn't mean unreachable.** These are live REST endpoints the
+  moment the backend is running, regardless of whether any frontend
+  calls them — the `permitAll()` security gap applies to Category/
+  Service/Banner today regardless of v1 status, so locking that down
+  isn't optional just because a module is "not in scope yet."
+
+Classification of Contact and Banner (v1 / v1.1 / genuinely unused) is
+still worth confirming with the client for documentation accuracy, but
+that's a scope question now, not a keep-or-delete one.
 
 ## Config / infra notes
 - Secrets (DB password, mail credentials, JWT secret) now come from env
@@ -524,6 +580,16 @@ above.
 8. Company: add the update (PUT, admin-only) endpoint.
 9. Inquiry: add admin list (GET) + status update (PATCH) endpoints, add a
    `notes` field.
-10. Get client decisions on: Contact controller (keep or drop), Banner
-    module (v1, v1.1, or drop), and Cart/Wishlist/Review/Newsletter (keep
-    dormant, remove, or fold into v1.1 scope).
+10. Confirm with the client whether Contact and Banner are v1.1 scope or
+    genuinely unused (not a deletion question — both stay in the
+    codebase either way, per the 2026-07-10 decision above).
+
+## Changelog
+- **2026-07-10** — Fixed a build-breaking bug on `developer-2`:
+  `WishlistService.toResponse()` called `Product.getImageUrl()`, which
+  doesn't exist on the `Product` entity (images live in a separate
+  `ProductImage` table). The method was dead code — nothing called it —
+  so it was removed along with the now-unused `WishlistResponse` DTO,
+  rather than patched to call something that doesn't fit the entity
+  model. `WishlistController`/`WishlistService` themselves are unchanged
+  and still fully working; only the broken, unused method was removed.

@@ -34,6 +34,13 @@ Site/company content: `Company`, `ServiceEntity`, `Gallery`, `Banner`.
 Lead gen / comms: `Inquiry`, `Newsletter`, `Notification`,
 `PasswordResetToken`.
 
+Not all of these are in scope for v1 — Cart, Wishlist, Product Reviews,
+Newsletter, Order, and Notification aren't called by anything in the v1
+client (mobile app + admin panel), but stay in the codebase intentionally
+rather than being deleted. See [project_context.md](project_context.md)
+for the actual v1 scope and [architecture.md](architecture.md) for the
+full module-by-module breakdown and reasoning.
+
 ## Auth
 JWT-based (`io.jsonwebtoken` / jjwt 0.11.5). Login/register/forgot-password/
 reset-password live in `AuthController` + `AuthService` +
@@ -73,7 +80,22 @@ Requires a running Postgres instance matching `DB_URL`/`DB_USERNAME`/
 `ddl-auto: update` — Hibernate auto-migrates the schema on startup, no
 separate migration tool (no Flyway/Liquibase) is wired in yet.
 
+## Known runtime defects (confirmed by running the server)
+Full detail, reproduction steps, and fixes in `architecture.md`'s
+"Confirmed defects" section:
+- `GET /api/auth/me` and `GET`/`PUT /api/profile` return the raw `User`
+  entity, leaking the BCrypt password hash in every response.
+- `GET /api/categories` throws `LazyInitializationException` (500) the
+  moment any category has a child — same pattern will hit `Product` once
+  its write endpoints exist.
+- Several write endpoints (`Category`, `Service`, `Banner`) are
+  unauthenticated right now due to a `permitAll()` path-matcher bug in
+  `SecurityConfig` that covers all HTTP methods, not just GET.
+
 ## Open questions
 - No `application-{profile}.yaml` files — dev/prod aren't split into
   Spring profiles yet.
 - No CI config found in the repo.
+- This repo has multiple branches (`main`, `developer-2`, plus a few
+  `feature/*` branches on `origin`) with diverging history — see
+  "Branches" in `project_context.md`. Not yet reconciled.
