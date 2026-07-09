@@ -54,6 +54,8 @@ springdoc:
     path: /api-docs
   swagger-ui:
     path: /swagger-ui.html
+  show-actuator: false
+  default-produces-media-type: application/json
 
 # Logging
 logging:

@@ -19,8 +19,11 @@ public class ProductResponse {
     private Integer stockQuantity;
     private String stockStatus;
     private Boolean isFeatured;
+    private Long categoryId;
     private Boolean isActive;
     private String categoryName;
+    private Double averageRating;
+    private Integer totalReviews;
     private String primaryImageUrl;
     private LocalDateTime createdAt;
 }

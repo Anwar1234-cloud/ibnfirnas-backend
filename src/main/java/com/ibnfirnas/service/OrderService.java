@@ -8,6 +8,7 @@ import com.ibnfirnas.exception.ResourceNotFoundException;
 import com.ibnfirnas.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -22,34 +23,88 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
 
-    public Order createOrder(OrderRequest request, String userEmail) {
+    // ============ toDTO ============
+    public OrderResponse toDTO(Order order) {
+        if (order == null) return null;
+
+        List<OrderResponse.OrderItemResponse> itemDTOs = null;
+        if (order.getItems() != null) {
+            itemDTOs = order.getItems().stream()
+                    .map(item -> {
+                        String imageUrl = null;
+                        if (item.getProduct() != null
+                                && item.getProduct().getImages() != null
+                                && !item.getProduct().getImages().isEmpty()) {
+                            imageUrl = item.getProduct().getImages()
+                                    .get(0).getImageUrl();
+                        }
+                        return OrderResponse.OrderItemResponse.builder()
+                                .id(item.getId())
+                                .productId(item.getProduct() != null
+                                        ? item.getProduct().getId() : null)
+                                .productName(item.getProduct() != null
+                                        ? item.getProduct().getName() : null)
+                                .productImage(imageUrl)
+                                .quantity(item.getQuantity())
+                                .unitPrice(item.getUnitPrice())
+                                .totalPrice(item.getTotalPrice())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        return OrderResponse.builder()
+                .id(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .totalAmount(order.getTotalAmount())
+                .status(order.getStatus() != null
+                        ? order.getStatus().name() : null)
+                .paymentStatus(order.getPaymentStatus() != null
+                        ? order.getPaymentStatus().name() : null)
+                .shippingAddress(order.getShippingAddress())
+                .paymentMethod(order.getPaymentMethod())
+                .trackingNumber(order.getTrackingNumber())
+                .items(itemDTOs)
+                .createdAt(order.getCreatedAt())
+                .build();
+    }
+
+    // ============ CRUD ============
+    public OrderResponse createOrder(OrderRequest request, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found: " + userEmail));
 
         Order order = Order.builder()
                 .user(user)
-                .orderNumber("IBN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .orderNumber("IBN-" + UUID.randomUUID()
+                        .toString().substring(0, 8).toUpperCase())
                 .shippingAddress(request.getShippingAddress())
                 .paymentMethod(request.getPaymentMethod())
                 .notes(request.getNotes())
                 .status(OrderStatus.PENDING)
                 .build();
 
-        List<OrderItem> items = request.getItems().stream().map(itemReq -> {
-            Product product = productRepository.findById(itemReq.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-            BigDecimal unitPrice = product.getDiscountPrice() != null
-                    ? product.getDiscountPrice() : product.getPrice();
-            BigDecimal totalPrice = unitPrice.multiply(
-                    BigDecimal.valueOf(itemReq.getQuantity()));
-            return OrderItem.builder()
-                    .order(order)
-                    .product(product)
-                    .quantity(itemReq.getQuantity())
-                    .unitPrice(unitPrice)
-                    .totalPrice(totalPrice)
-                    .build();
-        }).collect(Collectors.toList());
+        List<OrderItem> items = request.getItems().stream()
+                .map(itemReq -> {
+                    Product product = productRepository
+                            .findById(itemReq.getProductId())
+                            .orElseThrow(() -> new ResourceNotFoundException(
+                                    "Product not found: " + itemReq.getProductId()));
+
+                    BigDecimal unitPrice = product.getDiscountPrice() != null
+                            ? product.getDiscountPrice() : product.getPrice();
+                    BigDecimal totalPrice = unitPrice.multiply(
+                            BigDecimal.valueOf(itemReq.getQuantity()));
+
+                    return OrderItem.builder()
+                            .order(order)
+                            .product(product)
+                            .quantity(itemReq.getQuantity())
+                            .unitPrice(unitPrice)
+                            .totalPrice(totalPrice)
+                            .build();
+                }).collect(Collectors.toList());
 
         BigDecimal totalAmount = items.stream()
                 .map(OrderItem::getTotalPrice)
@@ -58,23 +113,36 @@ public class OrderService {
         order.setItems(items);
         order.setTotalAmount(totalAmount);
 
-        return orderRepository.save(order);
+        return toDTO(orderRepository.save(order));
     }
 
-    public List<Order> getUserOrders(String userEmail) {
+    public List<OrderResponse> getUserOrders(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        return orderRepository.findByUserId(user.getId());
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found: " + userEmail));
+        return orderRepository.findByUserId(user.getId())
+                .stream().map(this::toDTO)
+                .collect(Collectors.toList());
     }
 
-    public Order getOrderById(Long id) {
-        return orderRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+    public OrderResponse getOrderById(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Order not found with id: " + id));
+        return toDTO(order);
     }
 
-    public Order updateOrderStatus(Long id, OrderStatus status) {
-        Order order = getOrderById(id);
+    public OrderResponse updateOrderStatus(Long id, OrderStatus status) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Order not found with id: " + id));
         order.setStatus(status);
-        return orderRepository.save(order);
+        return toDTO(orderRepository.save(order));
+    }
+
+    public List<OrderResponse> getAllOrders() {
+        return orderRepository.findAll()
+                .stream().map(this::toDTO)
+                .collect(Collectors.toList());
     }
 }

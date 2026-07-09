@@ -15,7 +15,7 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/stats")
-    public ResponseEntity<ApiResponse<Map<String, Long>>> getStats() {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getStats() {
         return ResponseEntity.ok(
                 ApiResponse.success("Dashboard stats",
                         dashboardService.getStats()));
