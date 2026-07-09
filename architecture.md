@@ -77,28 +77,32 @@ Admin panel (browser)          Mobile app (React Native)
 
 ## Backend module → v1 requirement cross-check
 
-This is what actually exists in `src/main/java/com/ibnfirnas` today,
-checked against what v1 needs it to do.
+Re-verified 2026-07-10 after merging `main`'s substantial backend work
+into `developer-2` (Firebase/FCM plumbing, DTO layer, Product CRUD,
+Inquiry admin endpoints, Company update endpoint). Most gaps from the
+2026-07-09 audit are closed; three real issues remain or got newly
+introduced by the merge — see "Confirmed defects" below.
 
 | Module | v1 needs | Current state | Gap |
 |---|---|---|---|
-| Auth | Register, login, JWT, roles | `AuthController` has register/login/forgot-password/reset-password/refresh-token/me. `SecurityConfig` uses BCrypt + stateless JWT. `UserRole` = `ROLE_USER`/`ROLE_ADMIN`. | None — solid. |
-| User profile | Get/update profile | `ProfileController` GET/PUT `/api/profile`, backed by `UserRepository`. | None. |
-| Dashboard | Product/service/inquiry counts | `DashboardService.getStats()` returns totalUsers, totalProducts, totalOrders, totalInquiries, totalServices. | None (has a couple extra fields, harmless). |
-| Product | Full CRUD + image upload (Cloudinary) | `ProductController` / `ProductService` are **read-only**: list, by-id, featured. No create/update/delete. `ProductRequest` DTO exists but nothing calls it. | **Missing:** create/update/delete endpoints, image upload wiring. |
-| Service | Full CRUD | `ServiceController` has GET (all/featured/by-id) + POST create + DELETE. | **Missing:** update (PUT). |
-| Gallery | Upload/delete/list | `GalleryController` is **read-only** — one GET endpoint, talks directly to `GalleryRepository` (no service layer). | **Missing:** upload/delete endpoints entirely. |
-| Company | GET public / PUT admin | `CompanyController` is **read-only** — GET only. | **Missing:** update endpoint. |
-| Inquiry | POST public / GET + status update admin | `InquiryController` has POST only (public submit). No admin list or status/notes update. | **Missing:** admin GET list + status update. |
-| Image storage | Cloudinary | `FileStorageService` saves to a local `./uploads` folder via `Files.copy`, no Cloudinary SDK in `pom.xml`. | **Not started** — needs Cloudinary integration to match architecture. |
-| Order/Payment/Notification | Deferred to v1.1 | Order and Notification already have partial CRUD scaffolding; Payment has none. | Fine to leave as-is — not v1-blocking. |
+| Auth | Register, login, JWT, roles | `AuthController` has register/login/forgot-password/reset-password/refresh-token/me. `SecurityConfig` uses BCrypt + stateless JWT. `UserRole` = `ROLE_USER`/`ROLE_ADMIN`. | `GET /me` still leaks the password hash (see defects) — the rest is solid. |
+| User profile | Get/update profile | `ProfileController` GET/PUT `/api/profile`, now returns a `UserResponse` DTO, password change flow added. | **Fixed** — no more entity leak here. |
+| Dashboard | Product/service/inquiry counts | `DashboardService.getStats()` returns totalUsers, totalProducts, totalOrders, totalInquiries, totalServices. | None. |
+| Product | Full CRUD + image upload (Cloudinary) | `ProductController`/`ProductService` now have full GET/POST/PUT/DELETE via `ProductRequest`/`ProductResponse`. `Product.images` is `FetchType.EAGER` now (fixes the lazy-load crash). | **Still missing:** pagination on the catalog GET, actual Cloudinary upload (still no image upload wiring — `ProductRequest` doesn't carry a file). |
+| Service | Full CRUD | `ServiceController` has GET (all/featured/by-id) + POST create + DELETE. | **Still missing:** update (PUT) — unchanged from before. |
+| Gallery | Upload/delete/list | `GalleryController` now has GET/POST/DELETE, but POST takes a raw JSON `Gallery` body (no multipart/file upload), no service layer, no Cloudinary. `cloudinaryPublicId` column added 2026-07-10 (see below) but nothing writes to it yet. | **Still missing:** actual Cloudinary integration — the column is ready, the upload flow isn't built. |
+| Company | GET public / PUT admin | `CompanyController` now has GET/POST/PUT (`PUT /api/company/{id}`). | **Fixed** functionally — still unauthenticated, see security gap. |
+| Inquiry | POST public / GET + status update admin | `InquiryController` now has POST/GET list/GET by id/PUT resolve. | **New regression:** `/api/inquiries` isn't in `SecurityConfig`'s `permitAll` list anymore, so the public submit form now requires a login token — breaks the v1 requirement that inquiry submission needs no account. See defects below. |
+| Image storage | Cloudinary | `FileStorageService` still saves to local `./uploads`, unused by any controller now. No Cloudinary SDK in `pom.xml`. `Gallery.cloudinaryPublicId` column exists as of 2026-07-10 (Hibernate `ddl-auto: update` added it, verified live). | **Not started** — schema is ready, the actual `CloudinaryService` + SDK integration still needs building. |
+| Order/Payment/Notification | Deferred to v1.1 | Order gained an admin `/api/orders/all` (properly `hasRole("ADMIN")` gated). Notification unchanged (no real FCM call yet, despite `firebase-admin` now in `pom.xml` and `FirebaseConfig` added). Payment has none. | Fine to leave as-is — not v1-blocking. |
 
-## Full v1 API inventory (verified against a running instance, 2026-07-09)
+## Full v1 API inventory (re-verified against a running instance, 2026-07-10)
 
 Every endpoint that exists in the codebase today, for the modules that are
 actually in v1. "Auth (actual)" is what `SecurityConfig` really enforces
 right now, not what it should enforce — see "Security gap" below for the
-difference.
+difference. Updated after the `main` merge; changes from the 2026-07-09
+version are marked.
 
 ### Auth — `/api/auth`
 | Method & path | Auth (actual) | Request | Response | Consumer |
@@ -108,67 +112,69 @@ difference.
 | POST `/forgot-password` | public | `{email}` | `void` | Mobile app |
 | POST `/reset-password` | public | `{token, newPassword}` | `void` | Mobile app |
 | POST `/refresh-token` | authenticated | — (Bearer token) | `{accessToken}` | Both |
-| GET `/me` | authenticated | — | full `User` entity **(leaks password hash — see defects)** | Both |
+| GET `/me` | authenticated | — | full `User` entity **(still leaks password hash — unchanged, see defects)** | Both |
 
-### Profile — `/api/profile`
+### Profile — `/api/profile` — **fixed**
 | Method & path | Auth (actual) | Request | Response | Consumer |
 |---|---|---|---|---|
-| GET `/` | authenticated | — | full `User` entity **(leaks password hash)** | Mobile app |
-| PUT `/` | authenticated | full `User` JSON (only fullName/phone/avatarUrl are actually applied) | full `User` entity **(leaks password hash)** | Mobile app |
+| GET `/` | authenticated | — | `UserResponse` DTO (no password) | Mobile app |
+| PUT `/` | authenticated | `UpdateProfileRequest {fullName, phone, avatarUrl, currentPassword, newPassword}` | `UserResponse` DTO (no password) | Mobile app |
 
-### Product — `/api/products`
+### Product — `/api/products` — **CRUD now built**
 | Method & path | Auth (actual) | Request | Response | Consumer | Status |
 |---|---|---|---|---|---|
-| GET `/` | public | — | `List<Product>`, no pagination | Mobile app | Built, needs pagination |
-| GET `/{id}` | public | — | `Product` | Mobile app | Built |
-| GET `/featured` | public | — | `List<Product>` | Mobile app (home) | Built |
-| POST `/` | **public — should be admin** | `ProductRequest` DTO exists, unused | — | Admin panel | **Missing** |
-| PUT `/{id}` | **public — should be admin** | — | — | Admin panel | **Missing** |
-| DELETE `/{id}` | **public — should be admin** | — | — | Admin panel | **Missing** |
-| image upload | — | — | — | Admin panel | **Missing entirely** |
+| GET `/` | public | — | `List<ProductResponse>`, no pagination | Mobile app | Built, still needs pagination |
+| GET `/{id}` | public | — | `ProductResponse` | Mobile app | Built |
+| GET `/featured` | public | — | `List<ProductResponse>` | Mobile app (home) | Built |
+| POST `/` | **public — should be admin** | `ProductRequest` JSON, no file field | `ProductResponse` | Admin panel | Built, insecure, no image upload |
+| PUT `/{id}` | **public — should be admin** | `ProductRequest` JSON | `ProductResponse` | Admin panel | Built, insecure |
+| DELETE `/{id}` | **public — should be admin** | — | — | Admin panel | Built, insecure |
+| image upload | — | — | — | Admin panel | **Still missing entirely** — no multipart handling, no Cloudinary |
 
-### Category — `/api/categories`
+### Category — `/api/categories` — **lazy-load crash fixed**
 | Method & path | Auth (actual) | Request | Response | Consumer |
 |---|---|---|---|---|
-| GET `/` | public | — | `List<Category>` **(500s once any category has children — see defects)** | Mobile app |
-| GET `/{id}` | public | — | `Category` **(500s if it has children)** | Mobile app |
+| GET `/` | public | — | `List<Category>` (`children` now `FetchType.EAGER` + `@JsonIgnore` — no more 500) | Mobile app |
+| GET `/{id}` | public | — | `Category` | Mobile app |
 | POST `/` | **public, no role check** | raw `Category` entity | `Category` | Admin panel |
 | DELETE `/{id}` | **public, no role check** | — | `void` | Admin panel |
 
-### Service — `/api/services`
+### Service — `/api/services` — unchanged
 | Method & path | Auth (actual) | Request | Response | Consumer | Status |
 |---|---|---|---|---|---|
 | GET `/` | public | — | `List<ServiceEntity>` | Mobile app | Built |
 | GET `/featured` | public | — | `List<ServiceEntity>` | Mobile app (home) | Built |
 | GET `/{id}` | public | — | `ServiceEntity` | Mobile app | Built |
 | POST `/` | **public, no role check** | raw `ServiceEntity` | `ServiceEntity` | Admin panel | Built (insecure) |
-| PUT `/{id}` | — | — | — | Admin panel | **Missing** |
+| PUT `/{id}` | — | — | — | Admin panel | **Still missing** |
 | DELETE `/{id}` | **public, no role check** | — | `void` | Admin panel | Built (insecure) |
 
-### Gallery — `/api/gallery`
+### Gallery — `/api/gallery` — **write endpoints added, still no Cloudinary**
 | Method & path | Auth (actual) | Request | Response | Consumer | Status |
 |---|---|---|---|---|---|
-| GET `/` | public | — | `List<Gallery>`, ordered by `displayOrder` | Mobile app | Built, controller calls repository directly (no service layer) |
-| POST `/` (upload) | — | — | — | Admin panel | **Missing entirely** |
-| DELETE `/{id}` | — | — | — | Admin panel | **Missing entirely** |
+| GET `/` | public | — | `List<Gallery>`, ordered by `displayOrder` | Mobile app | Built |
+| POST `/` | **public in `SecurityConfig`, but code requires `@AuthenticationPrincipal`** — an anonymous call throws a `NullPointerException` (500) rather than a clean 401, since it needs a `UserDetails` to set `uploadedBy` | raw JSON `Gallery` body — **not multipart**, no actual file upload | `Gallery` | Admin panel | Built but not real upload; any *authenticated* user (not just admin) can call it if they attach a token |
+| DELETE `/{id}` | **public, no role check, no auth needed at all** | — | `void` | Admin panel | Built, wide open |
 
-### Company — `/api/company`
+### Company — `/api/company` — **write endpoints added**
 | Method & path | Auth (actual) | Request | Response | Consumer | Status |
 |---|---|---|---|---|---|
 | GET `/` | public | — | `Company` (about/mission/vision/contact/logo/banner) | Mobile app | Built |
-| PUT `/` | — | — | — | Admin panel | **Missing** |
+| POST `/` | **public, no role check** | raw `Company` entity | `Company` | Admin panel | Built, insecure — and since `Company` has no singleton constraint, this can create duplicate rows |
+| PUT `/{id}` | **public, no role check** | raw `Company` entity | `Company` | Admin panel | Built, insecure |
 
-### Inquiry — `/api/inquiries`
+### Inquiry — `/api/inquiries` — **admin endpoints added, but public submit is now broken**
 | Method & path | Auth (actual) | Request | Response | Consumer | Status |
 |---|---|---|---|---|---|
-| POST `/` | public | `InquiryRequest {name, email, phone, subject, message}` | `Inquiry` | Mobile app | Built |
-| GET `/` (admin list) | — | — | — | Admin panel | **Missing** |
-| PATCH/PUT `/{id}/status` | — | — | — | Admin panel | **Missing** |
+| POST `/` | **authenticated — regression, was public** | `InquiryRequest {name, email, phone, subject, message}` | `InquiryResponse` | Mobile app | **Broken for v1** — confirmed live: returns `403` with no token. The inquiry form is supposed to need no account. |
+| GET `/` (admin list) | authenticated (any role, not admin-specific) | — | `List<InquiryResponse>` | Admin panel | Built, but not actually admin-gated |
+| GET `/{id}` | authenticated (any role) | — | `InquiryResponse` | Admin panel | Built, not admin-gated |
+| PUT `/{id}/resolve` | authenticated (any role) | — | `InquiryResponse` | Admin panel | Built, not admin-gated |
 
 ### Dashboard — `/api/admin/dashboard`
 | Method & path | Auth (actual) | Request | Response | Consumer |
 |---|---|---|---|---|
-| GET `/stats` | **public — should be admin** (not in any `permitAll` matcher, but not `hasRole` either — falls to `anyRequest().authenticated()`, so actually just needs *any* logged-in user, not specifically an admin) | — | `{totalUsers, totalProducts, totalOrders, totalInquiries, totalServices}` | Admin panel |
+| GET `/stats` | correctly `hasRole("ADMIN")` via the `/api/admin/**` matcher | — | `{totalUsers, totalProducts, totalOrders, totalInquiries, totalServices}` | Admin panel |
 
 ## Frontend integration flow (per module)
 
@@ -295,17 +301,20 @@ Upload: admin panel → multipart → `GalleryController` (`POST
 `public_id` + `secure_url` → `GalleryService` builds entity → Postgres.
 Retrieval: mobile app → `GET /api/gallery` (public) → Postgres → JSON of
 Cloudinary URLs, app loads images directly from the CDN.
-**Schema gap:** current `Gallery` entity (`mediaUrl`, `thumbnailUrl`,
-`mediaType`) has no `public_id` field. When Cloudinary stores an image it
-hands back two things: a `secure_url` (the link to view/display it) and a
-`public_id` (its internal file identifier). To delete that image later,
-Cloudinary's API asks for the `public_id`, not the URL. If we only save
-the URL and never save the `public_id`, "delete" in the admin panel can
-only remove our database row — the actual file stays sitting in
-Cloudinary's storage forever, orphaned and still counting against the
-account's storage quota. Fix: add a `cloudinaryPublicId` column and save
-it at upload time (Cloudinary already returns it for free — no extra
-API call needed).
+**Schema gap — column added 2026-07-10, upload flow still not built.**
+When Cloudinary stores an image it hands back two things: a `secure_url`
+(the link to view/display it) and a `public_id` (its internal file
+identifier). To delete that image later, Cloudinary's API asks for the
+`public_id`, not the URL — without it, "delete" in the admin panel could
+only ever remove our database row, leaving the actual file orphaned in
+Cloudinary's storage forever. `Gallery.cloudinaryPublicId` now exists
+(verified live: `alter table if exists gallery add column
+cloudinary_public_id varchar(255)` ran via Hibernate's `ddl-auto: update`
+on startup) so the column is ready to receive it. What's still missing:
+there's no `CloudinaryService`, no SDK dependency in `pom.xml`, and
+`GalleryController.create()` still takes a raw JSON body instead of a
+multipart file upload — so nothing writes to the new column yet. The
+schema is prepped; the actual integration is the next step.
 
 ### Services
 Standard protected CRUD — admin writes, public reads. Admin path: admin
@@ -375,33 +384,41 @@ instead of an array column.
   mobile-app-only decision, noted here for completeness but doesn't
   affect this repo.
 
-## Security gap — confirmed by running the server (2026-07-09)
+## Security gap — still open, re-confirmed 2026-07-10 after the merge
 
-`SecurityConfig` currently does this:
+`SecurityConfig` still does this (unchanged by the `main` merge, plus two
+new additions marked):
 
 ```java
 .requestMatchers("/api/products/**").permitAll()
+.requestMatchers("/api/categories/**").permitAll()
 .requestMatchers("/api/services/**").permitAll()
 .requestMatchers("/api/gallery/**").permitAll()
 .requestMatchers("/api/company/**").permitAll()
 .requestMatchers("/api/banners/**").permitAll()
+.requestMatchers("/api/newsletter/**").permitAll()
+.requestMatchers("/api/contact/**").permitAll()
+.requestMatchers("/api/reviews/product/**").permitAll()
+.requestMatchers("/api/orders/all").hasRole("ADMIN")   // new — correct pattern
+.requestMatchers("/api/admin/**").hasRole("ADMIN")     // new — correct pattern
 ```
 
 `permitAll()` on a path pattern applies to **every HTTP method**, not just
-GET. This isn't theoretical — verified by starting the backend and
-calling `POST /api/categories` with **no `Authorization` header at all**:
+GET. Re-verified live, post-merge, with a fresh instance:
 
 ```
-POST /api/categories  {"name":"Parent Cat","slug":"parent-cat"}
+POST /api/categories  {"name":"Verify Cat","slug":"verify-cat"}
+(no Authorization header)
 → 200 OK, category created
 ```
 
-Since `ServiceController`, `BannerController`, and `CategoryController`
-already expose `POST`/`PUT`/`DELETE` under permitAll paths, anyone —
-unauthenticated, no token, nothing — can create/delete services, banners,
-and categories right now. Once Product, Gallery, and Company get their
-write endpoints (per the table above), the same hole opens there too
-unless the fix lands first.
+Still wide open. `Product`, `Company`, and `Gallery` all gained write
+endpoints in this merge (see the inventory above) and **inherited the
+same hole** — Product create/update/delete, Company create/update, and
+Gallery create/delete are all currently reachable by anyone with no
+token. `/api/orders/all` and `/api/admin/**` show the team already knows
+the right pattern (`hasRole("ADMIN")`) — it just hasn't been applied to
+Product/Category/Service/Gallery/Company/Banner's write methods yet.
 
 Fix needed: split each of these into separate GET-permitAll /
 write-hasRole("ADMIN") matchers, e.g.:
@@ -411,77 +428,74 @@ write-hasRole("ADMIN") matchers, e.g.:
 .requestMatchers("/api/products/**").hasRole("ADMIN")
 ```
 
-(repeated per module), instead of relying on the catch-all
-`/api/admin/**` prefix that only `DashboardController` currently uses —
-and even that one isn't actually role-gated (see defects below).
+(repeated per module).
 
-## Confirmed defects (verified by running the server, 2026-07-09)
+## Confirmed defects (re-verified live, 2026-07-10, after the `main` merge)
 
-These were reproduced against a live instance, not inferred from reading
-code — both will affect v1 directly.
+Status of each defect found on 2026-07-09, re-tested against a fresh
+instance after merging `main`'s DTO/entity fixes into `developer-2`, plus
+one new issue the merge introduced.
 
-### 1. Password hash leaks in API responses
-`AuthController.getCurrentUser()` (`GET /api/auth/me`) and both
-`ProfileController` endpoints (`GET`/`PUT /api/profile`) return the raw
-`User` JPA entity instead of a DTO. The entity has no `@JsonIgnore` on
-`password`, so the BCrypt hash goes out over the wire on every profile
-fetch:
+### 1. Password hash leak — **half-fixed**
+`ProfileController` (`GET`/`PUT /api/profile`) now returns a
+`UserResponse` DTO — fixed, no more leak there.
 
-```json
+`AuthController.getCurrentUser()` (`GET /api/auth/me`) was **not**
+touched by the merge and still returns the raw `User` entity. Re-verified
+live:
+
+```
 GET /api/auth/me →
-{"data":{"id":1,"email":"...","password":"$2a$10$9n.QCOtilYVm59r6lQs2SeIGP.ev2T9yfvn5tKd2xq.j1Bue1y91.", ...}}
+{"data":{"id":2,"email":"...",
+ "password":"$2a$10$tPnpUdsasRhs83GSYzDYt.TEBWCNvzNxne1eONcNvWGNnK4vHQiJa",
+ ...}}
 ```
 
-Not exploitable on its own (BCrypt is slow to crack), but it's a hash
-disclosure that should never leave the server, and it means every mobile
-app response, every network log, every crash reporter that captures
-response bodies now potentially contains a password hash. Fix: return a
-`UserResponse` DTO (id, email, fullName, phone, avatarUrl, role) instead
-of the entity, on both endpoints.
+Same fix as `ProfileController` already demonstrates the pattern — return
+`UserResponse` here too instead of `User`. Small, isolated change.
 
-### 2. `LazyInitializationException` — GET endpoints 500 once relations are populated
-Reproduced directly: created a parent category, then a child category
-pointing at it (via the open `POST /api/categories`, see security gap
-above), then called `GET /api/categories`:
+### 2. `LazyInitializationException` — **fixed**
+`Product.images` and `Category.children` are now `fetch = FetchType.EAGER`
+(`Category.children` also got `@JsonIgnore`, so it's not even serialized).
+`ProductController` now returns `ProductResponse` DTOs rather than raw
+entities. Re-verified live: created a parent/child category and called
+`GET /api/categories` — no more 500, clean response. This class of bug
+is closed for Category and Product; if any *other* entity gains a new
+`@OneToMany` later, apply the same fix (EAGER fetch or a DTO) rather than
+assuming lazy-by-default is safe with `open-in-view: false`.
 
-```json
-{"success":false,"message":"Something went wrong: Could not write JSON:
-failed to lazily initialize a collection of role:
-com.ibnfirnas.entity.Category.children: could not initialize proxy -
-no Session","data":null}
+### 3. Dashboard stats endpoint — fine, unchanged
+Still correctly gated by `/api/admin/**` + `hasRole("ADMIN")`. No issue.
+
+### 4. NEW — Inquiry public submission now requires login (v1-breaking)
+The merge added real admin endpoints to `InquiryController` (list, get,
+resolve) but `/api/inquiries` was never added to `SecurityConfig`'s
+`permitAll` list, so the whole controller now falls under
+`anyRequest().authenticated()`. Re-verified live:
+
 ```
-→ HTTP 500, and this breaks **every** row in the list, not just the one
-with a child.
+POST /api/inquiries  {"name":"Test","email":"t@example.com",
+                       "subject":"Hi","message":"Hello there"}
+(no Authorization header)
+→ 403 Forbidden
+```
 
-Root cause: `application.yaml` sets `open-in-view: false` (good practice
-on its own), but no entity DTO layer sits between JPA and Jackson for
-these modules — controllers return entities directly. Spring Data JPA
-repository calls are transactional only for the duration of the query
-itself; by the time Jackson serializes the response, the Hibernate
-session is closed. Any `@OneToMany`/lazy collection Jackson tries to
-touch during serialization throws.
+This breaks a core v1 requirement — the client's brief explicitly says
+the inquiry form needs no account ("fully public to submit"). A mobile
+app user who isn't logged in currently cannot submit an inquiry at all.
+Separately, the three new admin endpoints (`GET /`, `GET /{id}`,
+`PUT /{id}/resolve`) only require *some* authenticated user, not
+specifically `ROLE_ADMIN` — so once the public-submit fix adds
+`/api/inquiries` to `permitAll` for POST, the admin-only endpoints still
+need their own `hasRole("ADMIN")` matcher, or any logged-in mobile app
+user could view and resolve inquiries meant for admin eyes only.
 
-This is confirmed on `Category.children` right now, and **will hit the
-same wall on `Product.images` (`@OneToMany`, lazy) the moment Product
-CRUD is built and a product has more than the default fetch**, and
-potentially `Cart.items` once cart has data. It doesn't show up in
-today's read-only endpoints only because there's no data yet to trigger
-it (empty tables serialize fine).
-
-Fix: introduce response DTOs (`ProductResponse` already exists as a
-class but isn't used by the controller — same fix needed for
-`CategoryResponse`), or annotate collections `@JsonIgnore` where the
-frontend doesn't need them nested, rather than relying on returning raw
-entities anywhere a `@OneToMany`/`@ManyToMany` exists.
-
-### 3. Dashboard stats endpoint isn't actually admin-only
-`GET /api/admin/dashboard/stats` lives under `/api/admin/**`, which
-*is* covered by `.requestMatchers("/api/admin/**").hasRole("ADMIN")` in
-`SecurityConfig` — so this one's fine. Listed here only to confirm it
-was checked, not to report a bug: this is the one write-sensitive
-endpoint currently protected correctly, and the pattern it uses
-(`/api/admin/**` + `hasRole`) is the one to replicate for the other
-modules' write endpoints once they're built.
+### 5. NEW — Gallery POST can 500 for anonymous callers, and DELETE has zero auth
+`GalleryController.create()` requires `@AuthenticationPrincipal
+UserDetails` to set `uploadedBy`, but `/api/gallery/**` is `permitAll` —
+an anonymous POST hits a `NullPointerException` (500) instead of a clean
+401/403. `DELETE /api/gallery/{id}` needs no principal at all and no
+role check — same open-write pattern as Category/Service/Banner.
 
 ## Modules with no use in v1
 
@@ -495,10 +509,16 @@ Exist in the codebase, fully working, but called by nothing in the v1
 - **Newsletter** (`/api/newsletter`) — not in v1 *or* v1.1 checklist at
   all.
 - **Order** (`/api/orders`) — v1.1 commerce, not v1.
-- **Notification** (`/api/notifications`) — v1.1 (FCM), not v1; also has
-  no actual Firebase integration yet (`POST /{id}/send` just flips a flag
-  in the DB, doesn't call FCM — no `firebase-admin` dependency in
-  `pom.xml`).
+- **Notification** (`/api/notifications`) — v1.1 (FCM), not v1. Partial
+  plumbing landed in the `main` merge: `firebase-admin` is now a `pom.xml`
+  dependency, `FirebaseConfig` initializes the Firebase SDK from a
+  `firebase-service-account.json` file (gitignored, not present in the
+  repo — non-fatal if missing, `FirebaseConfig` just logs an error and
+  continues), and `DeviceToken`/`DeviceTokenController`/
+  `DeviceTokenRepository` exist for storing push tokens. `POST
+  /{id}/send` on `NotificationController` still doesn't appear to call
+  FCM directly — worth a closer look when v1.1 work actually starts, not
+  now.
 - **Contact** (`/api/contact`) — sends an email but never persists
   anything; functionally a near-duplicate of Inquiry submission
   (`ContactRequest` is the same shape as `InquiryRequest` minus
@@ -553,43 +573,59 @@ that's a scope question now, not a keep-or-delete one.
   going to a shared/staging DB.
 
 ## Next steps (backend, to unblock v1)
-Ordered by what blocks the most other work, given the confirmed defects
-above.
+Re-ordered 2026-07-10 after the `main` merge closed several items but
+introduced one urgent regression.
 
-1. **Fix the password leak** (`GET /api/auth/me`, `GET`/`PUT
-   /api/profile`) — return a `UserResponse` DTO instead of the raw
-   entity. Small, isolated, no dependency on anything else.
-2. **Fix `LazyInitializationException`** on `Category` now (already
-   reproducing in prod-shaped data), and preemptively on `Product`/`Cart`
-   before their write endpoints go live — introduce response DTOs rather
-   than returning entities directly wherever a `@OneToMany` exists.
-3. **Lock down the `permitAll()` security gap** — currently
-   unauthenticated write access to Category/Service/Banner, and it'll
-   extend to Product/Gallery/Company the moment those get write
-   endpoints if not fixed first.
-4. Replace `FileStorageService` (local disk) with a `CloudinaryService`
-   (Cloudinary Java SDK) — every module below depends on this.
-5. Product: add `specifications` JSONB column, add create/update/delete
-   endpoints with Cloudinary image upload wired to `ProductImage`, add
-   pagination (`Pageable`) to the catalog GET.
-6. Gallery: add a `GalleryService` layer (currently the controller talks
-   to the repository directly), add a `cloudinaryPublicId` column, add
-   upload/delete endpoints.
-7. Service: add the missing update (PUT) endpoint + Cloudinary image
-   upload.
-8. Company: add the update (PUT, admin-only) endpoint.
-9. Inquiry: add admin list (GET) + status update (PATCH) endpoints, add a
-   `notes` field.
-10. Confirm with the client whether Contact and Banner are v1.1 scope or
-    genuinely unused (not a deletion question — both stay in the
-    codebase either way, per the 2026-07-10 decision above).
+1. **Fix the Inquiry public-submit regression** — add `/api/inquiries`
+   (POST only) to `SecurityConfig`'s `permitAll`, and add
+   `hasRole("ADMIN")` on the list/get/resolve endpoints so they're not
+   left open to any logged-in user. This is actively broken for v1 right
+   now, highest priority.
+2. **Fix the remaining password leak** — `GET /api/auth/me` still returns
+   the raw `User` entity; apply the same `UserResponse` DTO fix
+   `ProfileController` already uses. Small, isolated.
+3. **Lock down the `permitAll()` security gap** — still open for
+   Category/Service/Banner (unchanged) and now also Product/Gallery/
+   Company (new, inherited by their new write endpoints). Split each
+   into GET-permitAll / write-hasRole("ADMIN"), following the pattern
+   `/api/admin/**` and `/api/orders/all` already use correctly.
+4. Fix `GalleryController.create()`'s `NullPointerException` risk for
+   anonymous callers (needs `@AuthenticationPrincipal` but the path is
+   `permitAll`) — folds into the security-gap fix above once POST
+   requires a role.
+5. Build the actual `CloudinaryService` (SDK dependency + upload/delete
+   calls) — the `Gallery.cloudinaryPublicId` column is ready
+   (2026-07-10), `GalleryController.create()` still needs to become a
+   real multipart upload instead of a raw JSON body.
+6. Product: wire Cloudinary image upload (schema mostly ready via
+   `ProductImage`), add pagination (`Pageable`) to the catalog GET, add
+   the `specifications` JSONB column per the earlier decision.
+7. Service: add the missing update (PUT) endpoint.
+8. Confirm with the client whether Contact and Banner are v1.1 scope or
+   genuinely unused (not a deletion question — both stay in the codebase
+   either way, per the 2026-07-10 keep-dormant decision).
 
 ## Changelog
-- **2026-07-10** — Fixed a build-breaking bug on `developer-2`:
+- **2026-07-10** — Re-audited all confirmed defects against `main`'s
+  merged code. Fixed by the merge: password leak in `ProfileController`
+  (now `UserResponse` DTO), `LazyInitializationException` on
+  `Category`/`Product` (now `FetchType.EAGER` + DTOs), Product CRUD,
+  Company update endpoint, Inquiry admin list/resolve endpoints. Still
+  open: `GET /api/auth/me` password leak, the `permitAll()` security gap
+  (now also covering Product/Gallery/Company). Newly introduced by the
+  merge: Inquiry's public submit endpoint now requires auth (breaks v1),
+  Gallery's POST can 500 for anonymous callers. All re-verified live
+  against a running instance, not just read from source.
+- **2026-07-10** — Added `Gallery.cloudinaryPublicId` column (verified
+  live via Hibernate's `ddl-auto: update` DDL log:
+  `alter table if exists gallery add column cloudinary_public_id
+  varchar(255)`). Prepares the schema for Cloudinary integration; the
+  actual `CloudinaryService`/SDK/upload flow still needs building —
+  nothing writes to this column yet.
+- **2026-07-10** — Fixed a build-breaking bug on `developer-2`, later
+  superseded by `main`'s proper fix during the merge:
   `WishlistService.toResponse()` called `Product.getImageUrl()`, which
-  doesn't exist on the `Product` entity (images live in a separate
-  `ProductImage` table). The method was dead code — nothing called it —
-  so it was removed along with the now-unused `WishlistResponse` DTO,
-  rather than patched to call something that doesn't fit the entity
-  model. `WishlistController`/`WishlistService` themselves are unchanged
-  and still fully working; only the broken, unused method was removed.
+  doesn't exist on the `Product` entity. Initially fixed by removing the
+  dead method; the `main` merge then brought in a complete, correct
+  `WishlistService`/`WishlistResponse` (proper DTO mapping via
+  `product.getImages()`), which is what's in the codebase now.

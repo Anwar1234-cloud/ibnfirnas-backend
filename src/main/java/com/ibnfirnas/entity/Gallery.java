@@ -26,6 +26,9 @@ public class Gallery {
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;
 
+    @Column(name = "cloudinary_public_id")
+    private String cloudinaryPublicId;
+
     @Builder.Default
     @Column(name = "media_type")
     private String mediaType = "IMAGE";
