@@ -3,6 +3,7 @@ package com.ibnfirnas.service;
 import com.ibnfirnas.dto.request.InquiryRequest;
 import com.ibnfirnas.dto.response.InquiryResponse;
 import com.ibnfirnas.entity.Inquiry;
+import com.ibnfirnas.entity.User;
 import com.ibnfirnas.entity.enums.InquiryStatus;
 import com.ibnfirnas.exception.ResourceNotFoundException;
 import com.ibnfirnas.repository.InquiryRepository;
@@ -36,9 +37,10 @@ public class InquiryService {
     }
 
     // ============ toEntity ============
-    public Inquiry toEntity(InquiryRequest request) {
+    public Inquiry toEntity(InquiryRequest request, User user) {
         if (request == null) return null;
         return Inquiry.builder()
+                .user(user)
                 .name(request.getName())
                 .email(request.getEmail())
                 .phone(request.getPhone())
@@ -50,13 +52,19 @@ public class InquiryService {
     }
 
     // ============ CRUD ============
-    public InquiryResponse submitInquiry(InquiryRequest request) {
-        Inquiry inquiry = toEntity(request);
+    public InquiryResponse submitInquiry(InquiryRequest request, User user) {
+        Inquiry inquiry = toEntity(request, user);
         return toDTO(inquiryRepository.save(inquiry));
     }
 
     public List<InquiryResponse> getAllInquiries() {
         return inquiryRepository.findAll()
+                .stream().map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<InquiryResponse> getMyInquiries(Long userId) {
+        return inquiryRepository.findByUserId(userId)
                 .stream().map(this::toDTO)
                 .collect(Collectors.toList());
     }
