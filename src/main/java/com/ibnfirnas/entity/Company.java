@@ -43,6 +43,19 @@ public class Company {
     @Column(name = "google_maps_url")
     private String googleMapsUrl;
 
+    @Column(name = "website_url")
+    private String websiteUrl;
+
+    @Column(name = "facebook_url")
+    private String facebookUrl;
+
+    @Column(name = "instagram_url")
+    private String instagramUrl;
+
+    @Column(name = "twitter_url")
+    private String twitterUrl;
+
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

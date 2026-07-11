@@ -36,19 +36,34 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/products/**").permitAll()
-                        .requestMatchers("/api/categories/**").permitAll()
-                        .requestMatchers("/api/services/**").permitAll()
-                        .requestMatchers("/api/gallery/**").permitAll()
-                        .requestMatchers("/api/company/**").permitAll()
-                        .requestMatchers("/api/banners/**").permitAll()
+
+                        // Public catalog/content reads; writes are admin-only.
+                        .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        .requestMatchers("/api/products/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
+                        .requestMatchers("/api/categories/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/services/**").permitAll()
+                        .requestMatchers("/api/services/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/gallery/**").permitAll()
+                        .requestMatchers("/api/gallery/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/company/**").permitAll()
+                        .requestMatchers("/api/company/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/banners/**").permitAll()
+                        .requestMatchers("/api/banners/**").hasRole("ADMIN")
+
                         .requestMatchers("/api/newsletter/**").permitAll()
                         .requestMatchers("/api/contact/**").permitAll()
                         .requestMatchers("/api/reviews/product/**").permitAll()
+
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/swagger-ui.html").permitAll()
                         .requestMatchers("/api-docs/**").permitAll()
                         .requestMatchers("/v3/api-docs/**").permitAll()
+
+                        // Inquiry submission now requires a logged-in user (any role).
+                        .requestMatchers(HttpMethod.POST, "/api/inquiries").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/inquiries/my").authenticated()
+                        .requestMatchers("/api/inquiries", "/api/inquiries/**").hasRole("ADMIN")
                         .requestMatchers("/api/orders/all").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
