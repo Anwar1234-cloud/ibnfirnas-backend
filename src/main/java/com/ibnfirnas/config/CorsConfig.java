@@ -14,10 +14,30 @@ public class CorsConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
+
+        //  false — wildcard * ke saath credentials true nahi ho sakta
+        config.setAllowCredentials(false);
+
+        // All origins allow — ngrok, localhost, mobile app
         config.setAllowedOriginPatterns(List.of("*"));
+
+        //  All headers allow
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
+
+        //  All methods allow + PATCH bhi
+        config.setAllowedMethods(List.of(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
+        ));
+
+        //  Headers jo response mein expose hon
+        config.setExposedHeaders(List.of(
+                "Authorization",
+                "Content-Type"
+        ));
+
+        //  Preflight cache — 1 hour
+        config.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);

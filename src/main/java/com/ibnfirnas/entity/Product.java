@@ -86,4 +86,7 @@ public class Product {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "primary_image_url")
+    private String primaryImageUrl;
+
 }

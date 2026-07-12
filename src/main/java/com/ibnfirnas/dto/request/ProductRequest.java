@@ -24,4 +24,5 @@ public class ProductRequest {
     private Boolean isFeatured;
     private Boolean isActive;
     private Long categoryId;
+    private String primaryImageUrl;
 }

@@ -25,10 +25,14 @@ public class ProductService {
     public ProductResponse toDTO(Product product) {
         if (product == null) return null;
 
-        String primaryImageUrl = null;
-        if (product.getImages() != null && !product.getImages().isEmpty()) {
+        String primaryImageUrl = product.getPrimaryImageUrl();
+
+        if ((primaryImageUrl == null || primaryImageUrl.isBlank())
+                && product.getImages() != null
+                && !product.getImages().isEmpty()) {
+
             primaryImageUrl = product.getImages().stream()
-                    .filter(img -> img.getIsPrimary() != null && img.getIsPrimary())
+                    .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
                     .findFirst()
                     .map(ProductImage::getImageUrl)
                     .orElse(product.getImages().get(0).getImageUrl());
@@ -82,6 +86,7 @@ public class ProductService {
                 .isActive(request.getIsActive() != null
                         ? request.getIsActive() : true)
                 .category(category)
+                .primaryImageUrl(request.getPrimaryImageUrl())
                 .build();
     }
 
@@ -128,6 +133,9 @@ public class ProductService {
             product.setStockQuantity(request.getStockQuantity());
         if (request.getIsFeatured() != null)
             product.setIsFeatured(request.getIsFeatured());
+        if (request.getPrimaryImageUrl() != null)
+            product.setPrimaryImageUrl(request.getPrimaryImageUrl());
+
         if (request.getIsActive() != null)
             product.setIsActive(request.getIsActive());
         if (request.getCategoryId() != null) {
