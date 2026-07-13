@@ -2,6 +2,7 @@ package com.ibnfirnas.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import com.ibnfirnas.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,12 +19,17 @@ public class CloudinaryService {
     private final Cloudinary cloudinary;
 
     public String uploadImage(MultipartFile file, String folder) {
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BadRequestException("Only image files are allowed");
+        }
+
         try {
             Map uploadResult = cloudinary.uploader().upload(
                     file.getBytes(),
                     ObjectUtils.asMap(
                             "folder", "ibnfirnas/" + folder,
-                            "resource_type", "auto",
+                            "resource_type", "image",
                             "quality", "auto",
                             "fetch_format", "auto"
                     )
@@ -42,15 +48,22 @@ public class CloudinaryService {
             log.info("Deleted image: {}", publicId);
         } catch (IOException e) {
             log.error("Cloudinary delete failed: {}", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            log.error("Cloudinary delete skipped, not a valid Cloudinary URL: {}", imageUrl);
         }
     }
 
     private String extractPublicId(String imageUrl) {
+        int uploadIndex = imageUrl.indexOf("/upload/");
+        if (uploadIndex == -1) {
+            throw new IllegalArgumentException("Not a valid Cloudinary URL: " + imageUrl);
+        }
 
-        String[] parts = imageUrl.split("/");
-        String filename = parts[parts.length - 1];
-        String folder = parts[parts.length - 2];
-        String parentFolder = parts[parts.length - 3];
-        return parentFolder + "/" + folder + "/" + filename.split("\\.")[0];
+        String afterUpload = imageUrl.substring(uploadIndex + "/upload/".length());
+        // Strip an optional version segment, e.g. "v1690000000/"
+        afterUpload = afterUpload.replaceFirst("^v\\d+/", "");
+        // Strip the file extension
+        int lastDot = afterUpload.lastIndexOf('.');
+        return lastDot == -1 ? afterUpload : afterUpload.substring(0, lastDot);
     }
 }
