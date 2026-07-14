@@ -9,6 +9,7 @@ import com.ibnfirnas.repository.UserRepository;
 import com.ibnfirnas.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +32,7 @@ public class NotificationController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Notification>> create(
             @RequestBody Notification notification,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -48,6 +50,7 @@ public class NotificationController {
     }
 
     @PostMapping("/{id}/send")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Notification>> send(@PathVariable Long id) {
         return ResponseEntity.ok(
                 ApiResponse.success("Notification sent",
@@ -55,6 +58,7 @@ public class NotificationController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         notificationService.deleteNotification(id);
         return ResponseEntity.ok(ApiResponse.success("Notification deleted", null));

@@ -28,10 +28,20 @@ public class InquiryController {
     public ResponseEntity<ApiResponse<InquiryResponse>> submitInquiry(
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody InquiryRequest request) {
-        User user = userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        return ResponseEntity.ok(ApiResponse.success("Inquiry submitted",
-                inquiryService.submitInquiry(request, user)));
+
+        User user = null;
+
+        if (userDetails != null) {
+            user = userRepository.findByEmail(userDetails.getUsername())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        }
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Inquiry submitted",
+                        inquiryService.submitInquiry(request, user)
+                )
+        );
     }
 
     @GetMapping("/my")

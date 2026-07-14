@@ -7,6 +7,7 @@ import com.ibnfirnas.repository.CompanyRepository;
 import com.ibnfirnas.service.CompanyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,6 +23,7 @@ public class CompanyController {
         return ResponseEntity.ok(
                 ApiResponse.success("Company info fetched", companyService.getCompanyInfo()));
     }
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<Company>> update(
             @PathVariable Long id,
@@ -57,6 +59,7 @@ public class CompanyController {
                 companyRepository.save(existing)));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping
     public ResponseEntity<ApiResponse<Company>> create(
             @RequestBody Company company) {

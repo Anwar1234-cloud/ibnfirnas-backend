@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -21,6 +22,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -62,9 +64,13 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**").permitAll()
 
                         // Inquiry submission now requires a logged-in user (any role).
-                        .requestMatchers(HttpMethod.POST, "/api/inquiries").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/inquiries").permitAll()
+
                         .requestMatchers(HttpMethod.GET, "/api/inquiries/my").authenticated()
-                        .requestMatchers("/api/inquiries", "/api/inquiries/**").hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/api/inquiries").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/inquiries/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/inquiries/**").hasRole("ADMIN")
                         .requestMatchers("/api/orders/all").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

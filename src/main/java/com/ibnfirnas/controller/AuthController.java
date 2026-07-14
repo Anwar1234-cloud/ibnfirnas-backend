@@ -57,7 +57,8 @@ public class AuthController {
             @AuthenticationPrincipal UserDetails userDetails) {
         String newToken = jwtTokenProvider.generateToken(userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.success("Token refreshed",
-                RefreshTokenResponse.builder().accessToken(newToken).build()));
+                RefreshTokenResponse.builder().accessToken(newToken)
+                        .tokenType("Bearer").build()));
     }
 
     @GetMapping("/me")
@@ -65,6 +66,16 @@ public class AuthController {
             @AuthenticationPrincipal UserDetails userDetails) {
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        UserResponse response = UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
+                .role(user.getRole() != null ? user.getRole().name() : null)
+                .isActive(user.getIsActive())
+                .createdAt(user.getCreatedAt())
+                .build();
         return ResponseEntity.ok(ApiResponse.success("Current user", user));
     }
 }

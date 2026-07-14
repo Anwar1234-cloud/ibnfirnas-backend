@@ -1,5 +1,6 @@
 package com.ibnfirnas.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.ibnfirnas.entity.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -22,6 +23,7 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 

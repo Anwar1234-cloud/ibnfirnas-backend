@@ -5,6 +5,7 @@ import com.ibnfirnas.entity.Banner;
 import com.ibnfirnas.service.BannerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -22,18 +23,21 @@ public class BannerController {
     }
 
     @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<Banner>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("All banners",
                 bannerService.getAllBanners()));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Banner>> create(@RequestBody Banner banner) {
         return ResponseEntity.ok(ApiResponse.success("Banner created",
                 bannerService.saveBanner(banner)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Banner>> update(
             @PathVariable Long id, @RequestBody Banner banner) {
         return ResponseEntity.ok(ApiResponse.success("Banner updated",
@@ -41,6 +45,7 @@ public class BannerController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         bannerService.deleteBanner(id);
         return ResponseEntity.ok(ApiResponse.success("Banner deleted", null));

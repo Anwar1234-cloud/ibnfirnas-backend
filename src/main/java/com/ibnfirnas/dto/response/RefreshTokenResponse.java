@@ -7,5 +7,6 @@ import lombok.*;
 @Builder
 public class RefreshTokenResponse {
     private String accessToken;
+    @Builder.Default
     private String tokenType = "Bearer";
 }

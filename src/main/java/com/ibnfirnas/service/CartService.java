@@ -8,9 +8,11 @@ import com.ibnfirnas.exception.ResourceNotFoundException;
 import com.ibnfirnas.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -72,6 +74,7 @@ public class CartService {
     }
 
     public CartResponse addToCart(CartRequest request, String userEmail) {
+
         User user = getUser(userEmail);
 
         if (request.getQuantity() == null || request.getQuantity() <= 0) {
@@ -91,33 +94,65 @@ public class CartService {
                         Cart.builder().user(user).build()));
 
         BigDecimal unitPrice = product.getDiscountPrice() != null
-                ? product.getDiscountPrice() : product.getPrice();
+                ? product.getDiscountPrice()
+                : product.getPrice();
 
-        CartItem item = CartItem.builder()
-                .cart(cart)
-                .product(product)
-                .quantity(request.getQuantity())
-                .unitPrice(unitPrice)
-                .totalPrice(unitPrice.multiply(
-                        BigDecimal.valueOf(request.getQuantity())))
-                .build();
+        Optional<CartItem> existingItem =
+                cartItemRepository.findByCartIdAndProductId(
+                        cart.getId(),
+                        product.getId()
+                );
 
-        cartItemRepository.save(item);
-        return toDTO(recalculate(cart));
-    }
+        if (existingItem.isPresent()) {
 
-    public CartResponse removeFromCart(Long cartItemId, String userEmail) {
-        User user = getUser(userEmail);
-        CartItem item = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Cart item not found with id: " + cartItemId));
+            CartItem item = existingItem.get();
 
-        Cart cart = item.getCart();
-        if (!cart.getUser().getId().equals(user.getId())) {
-            throw new BadRequestException("Not authorized to remove this item");
+            item.setQuantity(item.getQuantity() + request.getQuantity());
+
+            item.setTotalPrice(
+                    item.getUnitPrice().multiply(
+                            BigDecimal.valueOf(item.getQuantity()))
+            );
+
+            cartItemRepository.save(item);
+
+        } else {
+
+            CartItem item = CartItem.builder()
+                    .cart(cart)
+                    .product(product)
+                    .quantity(request.getQuantity())
+                    .unitPrice(unitPrice)
+                    .totalPrice(unitPrice.multiply(
+                            BigDecimal.valueOf(request.getQuantity())))
+                    .build();
+
+            cartItemRepository.save(item);
         }
 
-        cartItemRepository.deleteById(cartItemId);
+        return toDTO(recalculate(cart));
+    }
+    @Transactional
+    public CartResponse removeFromCart(Long cartItemId, String userEmail) {
+
+        User user = getUser(userEmail);
+
+        CartItem item = cartItemRepository.findById(cartItemId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Cart item not found"));
+
+        Cart cart = item.getCart();
+
+        if (!cart.getUser().getId().equals(user.getId())) {
+            throw new BadRequestException("Not authorized");
+        }
+
+        int rows = cartItemRepository.deleteCartItemNative(cartItemId);
+
+        System.out.println("Rows deleted = " + rows);
+
+        cartItemRepository.flush();
+
         return toDTO(recalculate(cart));
     }
 
@@ -141,6 +176,7 @@ public class CartService {
         BigDecimal subtotal = items.stream()
                 .map(CartItem::getTotalPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        cart.setItems(items);
         cart.setSubtotal(subtotal);
         cart.setTotal(subtotal);
         cart.setTotalItems(items.size());
