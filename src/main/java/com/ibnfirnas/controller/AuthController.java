@@ -62,11 +62,15 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<User>> getCurrentUser(
+    public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(
             @AuthenticationPrincipal UserDetails userDetails) {
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        UserResponse response = UserResponse.builder()
+        return ResponseEntity.ok(ApiResponse.success("Current user", toDTO(user)));
+    }
+
+    private UserResponse toDTO(User user) {
+        return UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
@@ -76,7 +80,6 @@ public class AuthController {
                 .isActive(user.getIsActive())
                 .createdAt(user.getCreatedAt())
                 .build();
-        return ResponseEntity.ok(ApiResponse.success("Current user", user));
     }
 
 }

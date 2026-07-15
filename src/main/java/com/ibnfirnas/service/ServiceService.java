@@ -31,7 +31,6 @@ public class ServiceService {
         return serviceRepository.save(service);
     }
 
-
     public ServiceEntity createService(ServiceRequest request) {
         ServiceEntity service = ServiceEntity.builder()
                 .name(request.getName())
