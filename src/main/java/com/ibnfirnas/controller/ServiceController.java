@@ -44,6 +44,15 @@ public class ServiceController {
                         serviceService.saveService(service)));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<ServiceEntity>> update(
+            @PathVariable Long id,
+            @RequestBody ServiceEntity service) {
+        return ResponseEntity.ok(
+                ApiResponse.success("Service updated",
+                        serviceService.updateService(id, service)));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         serviceService.deleteService(id);
