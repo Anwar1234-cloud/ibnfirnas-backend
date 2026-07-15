@@ -1,5 +1,6 @@
 package com.ibnfirnas.service;
 
+import com.ibnfirnas.entity.enums.OtpPurpose;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,5 +57,20 @@ public class EmailService {
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage());
         }
+    }
+    public void sendOtpEmail(String toEmail, String otp, OtpPurpose purpose) {
+        String subject = switch (purpose) {
+            case REGISTRATION -> "IBN Firnas - Email Verification OTP";
+            case LOGIN -> "IBN Firnas - Login OTP";
+            case FORGOT_PASSWORD -> "IBN Firnas - Password Reset OTP";
+        };
+
+        String body = "Dear User,\n\n" +
+                "Your IBN Firnas OTP is: " + otp + "\n\n" +
+                "This OTP is valid for 10 minutes.\n" +
+                "Do not share this OTP with anyone.\n\n" +
+                "IBN Firnas Team";
+
+        sendEmail(toEmail, subject, body);
     }
 }

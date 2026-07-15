@@ -80,7 +80,7 @@ public class ProfileController {
             user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         }
 
-        return ResponseEntity.ok(ApiResponse.success("Profile updated",
+        return ResponseEntity.ok(ApiResponse.success("Profile updated successfully",
                 toDTO(userRepository.save(user))));
     }
 }

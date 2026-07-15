@@ -57,7 +57,8 @@ public class AuthController {
             @AuthenticationPrincipal UserDetails userDetails) {
         String newToken = jwtTokenProvider.generateToken(userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.success("Token refreshed",
-                RefreshTokenResponse.builder().accessToken(newToken).build()));
+                RefreshTokenResponse.builder().accessToken(newToken)
+                        .tokenType("Bearer").build()));
     }
 
     @GetMapping("/me")
@@ -80,4 +81,5 @@ public class AuthController {
                 .createdAt(user.getCreatedAt())
                 .build();
     }
+
 }

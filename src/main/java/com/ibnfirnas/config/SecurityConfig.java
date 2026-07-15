@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -23,6 +24,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -43,11 +45,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
 
                         // Public catalog/content reads; writes are admin-only.
-                        .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
                         .requestMatchers("/api/products/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
                         .requestMatchers("/api/categories/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/services/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/services", "/api/services/**").permitAll()
                         .requestMatchers("/api/services/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/gallery/**").permitAll()
                         .requestMatchers("/api/gallery/**").hasRole("ADMIN")
@@ -67,11 +69,16 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**").permitAll()
 
                         // Inquiry submission now requires a logged-in user (any role).
-                        .requestMatchers(HttpMethod.POST, "/api/inquiries").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/inquiries").permitAll()
+
                         .requestMatchers(HttpMethod.GET, "/api/inquiries/my").authenticated()
-                        .requestMatchers("/api/inquiries", "/api/inquiries/**").hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/api/inquiries").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/inquiries/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/inquiries/**").hasRole("ADMIN")
                         .requestMatchers("/api/orders/all").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/otp/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter,

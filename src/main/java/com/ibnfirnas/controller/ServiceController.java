@@ -1,8 +1,10 @@
 package com.ibnfirnas.controller;
 
+import com.ibnfirnas.dto.request.ServiceRequest;
 import com.ibnfirnas.dto.response.ApiResponse;
 import com.ibnfirnas.entity.ServiceEntity;
 import com.ibnfirnas.service.ServiceService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,7 +32,8 @@ public class ServiceController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ServiceEntity>> getById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<ServiceEntity>> getById(
+            @PathVariable Long id) {
         return ResponseEntity.ok(
                 ApiResponse.success("Service fetched",
                         serviceService.getServiceById(id)));
@@ -38,24 +41,26 @@ public class ServiceController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<ServiceEntity>> create(
-            @RequestBody ServiceEntity service) {
+            @Valid @RequestBody ServiceRequest request) {
         return ResponseEntity.ok(
                 ApiResponse.success("Service created",
-                        serviceService.saveService(service)));
+                        serviceService.createService(request)));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<ServiceEntity>> update(
             @PathVariable Long id,
-            @RequestBody ServiceEntity service) {
+            @Valid @RequestBody ServiceRequest request) {
         return ResponseEntity.ok(
                 ApiResponse.success("Service updated",
-                        serviceService.updateService(id, service)));
+                        serviceService.updateService(id, request)));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @PathVariable Long id) {
         serviceService.deleteService(id);
-        return ResponseEntity.ok(ApiResponse.success("Service deleted", null));
+        return ResponseEntity.ok(
+                ApiResponse.success("Service deleted", null));
     }
 }
