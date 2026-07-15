@@ -78,4 +78,5 @@ public class AuthController {
                 .build();
         return ResponseEntity.ok(ApiResponse.success("Current user", user));
     }
+
 }

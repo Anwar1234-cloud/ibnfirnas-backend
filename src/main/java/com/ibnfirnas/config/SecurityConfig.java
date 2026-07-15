@@ -73,6 +73,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/inquiries/**").hasRole("ADMIN")
                         .requestMatchers("/api/orders/all").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/otp/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter,
