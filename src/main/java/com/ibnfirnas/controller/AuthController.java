@@ -11,6 +11,7 @@ import com.ibnfirnas.service.PasswordResetService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -62,10 +63,16 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<User>> getCurrentUser(
+    public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(
             @AuthenticationPrincipal UserDetails userDetails) {
+
+        if (userDetails == null) {
+            throw new BadCredentialsException("Unauthorized");
+        }
+
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
         UserResponse response = UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -76,7 +83,8 @@ public class AuthController {
                 .isActive(user.getIsActive())
                 .createdAt(user.getCreatedAt())
                 .build();
-        return ResponseEntity.ok(ApiResponse.success("Current user", user));
+
+        return ResponseEntity.ok(ApiResponse.success("Current user", response));
     }
 
 }
