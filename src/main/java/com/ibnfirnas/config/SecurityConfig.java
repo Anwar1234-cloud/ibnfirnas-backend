@@ -1,6 +1,8 @@
 package com.ibnfirnas.config;
 
 import com.ibnfirnas.security.JwtAuthenticationFilter;
+import com.ibnfirnas.security.RestAccessDeniedHandler;
+import com.ibnfirnas.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -29,6 +31,8 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
 
     @Value("${cors.allowed-origins:http://localhost:5173}")
     private String allowedOrigins;
@@ -40,6 +44,9 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
