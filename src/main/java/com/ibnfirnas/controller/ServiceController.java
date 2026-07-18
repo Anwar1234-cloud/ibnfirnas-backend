@@ -2,6 +2,7 @@ package com.ibnfirnas.controller;
 
 import com.ibnfirnas.dto.request.ServiceRequest;
 import com.ibnfirnas.dto.response.ApiResponse;
+import com.ibnfirnas.dto.response.PageResponse;
 import com.ibnfirnas.entity.ServiceEntity;
 import com.ibnfirnas.service.ServiceService;
 import jakarta.validation.Valid;
@@ -18,10 +19,12 @@ public class ServiceController {
     private final ServiceService serviceService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ServiceEntity>>> getAll() {
+    public ResponseEntity<ApiResponse<PageResponse<ServiceEntity>>> getAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(
                 ApiResponse.success("Services fetched",
-                        serviceService.getAllServices()));
+                        serviceService.getAllServices(page, size)));
     }
 
     @GetMapping("/featured")

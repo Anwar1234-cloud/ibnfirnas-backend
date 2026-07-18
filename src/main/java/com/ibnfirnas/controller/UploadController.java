@@ -26,10 +26,10 @@ public class UploadController {
                     .body(ApiResponse.error("File is empty"));
         }
 
-        String url = cloudinaryService.uploadImage(file, folder);
+        CloudinaryService.UploadResult result = cloudinaryService.uploadImage(file, folder);
         return ResponseEntity.ok(
                 ApiResponse.success("Image uploaded successfully",
-                        Map.of("url", url)));
+                        Map.of("url", result.url(), "publicId", result.publicId())));
     }
 
     @DeleteMapping("/image")
