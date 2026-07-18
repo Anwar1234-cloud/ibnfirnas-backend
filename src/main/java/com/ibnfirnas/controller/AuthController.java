@@ -11,6 +11,7 @@ import com.ibnfirnas.service.PasswordResetService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -55,6 +56,10 @@ public class AuthController {
     @PostMapping("/refresh-token")
     public ResponseEntity<ApiResponse<RefreshTokenResponse>> refreshToken(
             @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            throw new BadCredentialsException("Unauthorized");
+        }
+
         String newToken = jwtTokenProvider.generateToken(userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.success("Token refreshed",
                 RefreshTokenResponse.builder().accessToken(newToken)
@@ -64,13 +69,14 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(
             @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            throw new BadCredentialsException("Unauthorized");
+        }
+
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        return ResponseEntity.ok(ApiResponse.success("Current user", toDTO(user)));
-    }
 
-    private UserResponse toDTO(User user) {
-        return UserResponse.builder()
+        UserResponse response = UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
@@ -80,6 +86,8 @@ public class AuthController {
                 .isActive(user.getIsActive())
                 .createdAt(user.getCreatedAt())
                 .build();
+
+        return ResponseEntity.ok(ApiResponse.success("Current user", response));
     }
 
 }
