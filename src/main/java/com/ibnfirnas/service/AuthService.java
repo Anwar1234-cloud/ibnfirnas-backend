@@ -22,11 +22,14 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
+    private final OtpService otpService;
 
     public ApiResponse<AuthResponse> register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("Email already registered");
         }
+
+        otpService.verifySmsOtp(request.getPhone(), request.getOtp());
 
         User user = User.builder()
                 .fullName(request.getFullName())
