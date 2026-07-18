@@ -49,6 +49,14 @@ public class SecurityConfig {
                         .accessDeniedHandler(restAccessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // /me and /refresh-token need a valid token — carved out
+                        // of the blanket permitAll below so an anonymous call is
+                        // rejected by Spring Security itself (clean 401 via
+                        // RestAuthenticationEntryPoint) instead of reaching the
+                        // controller and NPE-ing on a null @AuthenticationPrincipal.
+                        .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/refresh-token").authenticated()
                         .requestMatchers("/api/auth/**").permitAll()
 
                         // Public catalog/content reads; writes are admin-only.
