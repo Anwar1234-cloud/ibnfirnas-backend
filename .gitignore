@@ -3,11 +3,6 @@ target/
 .env
 *.md
 !README.md
-!changelog.md
-!architecture.md
-!context.md
-!project_context.md
-!frontend-integration-spec.md
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
