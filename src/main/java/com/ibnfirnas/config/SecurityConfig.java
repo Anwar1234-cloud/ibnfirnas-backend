@@ -91,6 +91,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/inquiries/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/inquiries/**").hasRole("ADMIN")
                         .requestMatchers("/api/orders/all").hasRole("ADMIN")
+
+                        // Notification is an admin-only broadcast tool, not a
+                        // public/user-readable resource like Product/Gallery/etc.
+                        // — every method, including GET, is admin-only. Previously
+                        // had no matcher at all here and fell through to the
+                        // anyRequest().authenticated() catch-all below, letting
+                        // any logged-in user (any role) list notifications and
+                        // leak the creating admin's password hash via the raw
+                        // entity response (now fixed separately with a
+                        // NotificationResponse DTO in NotificationController).
+                        .requestMatchers("/api/notifications/**").hasRole("ADMIN")
+
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/otp/**").permitAll()
                         .anyRequest().authenticated()
