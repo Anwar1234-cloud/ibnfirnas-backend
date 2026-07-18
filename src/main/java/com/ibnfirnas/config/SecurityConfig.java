@@ -74,7 +74,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/banners/**").hasRole("ADMIN")
                         .requestMatchers("/api/upload/**").hasRole("ADMIN")
 
-                        .requestMatchers("/api/newsletter/**").permitAll()
                         .requestMatchers("/api/contact/**").permitAll()
                         .requestMatchers("/api/reviews/product/**").permitAll()
 

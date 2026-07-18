@@ -28,19 +28,6 @@ public class EmailService {
                         "Message:\n" + message);
     }
 
-    public void sendOrderConfirmation(String toEmail, String orderNumber) {
-        sendEmail(toEmail,
-                "Order Confirmed - " + orderNumber,
-                "Your order " + orderNumber + " has been confirmed.\n\nIBN Firnas Team");
-    }
-
-    public void sendWelcomeEmail(String toEmail, String fullName) {
-        sendEmail(toEmail,
-                "Welcome to IBN Firnas!",
-                "Dear " + fullName + ",\n\nWelcome to IBN Firnas. " +
-                        "We are glad to have you.\n\nIBN Firnas Team");
-    }
-
     private void sendEmail(String to, String subject, String body) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();

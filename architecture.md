@@ -524,15 +524,14 @@ deploying anywhere beyond `localhost:5173`.
 
 **Still fully open, left unchanged by design:**
 ```java
-.requestMatchers("/api/newsletter/**").permitAll()
 .requestMatchers("/api/contact/**").permitAll()
 .requestMatchers("/api/reviews/product/**").permitAll()
 ```
 `permitAll()` on these path patterns still applies to every HTTP method,
-so Newsletter/Contact/Reviews writes remain unauthenticated. Left as-is
-because none of the three are in the v1 checklist — see "Modules with no
-use in v1" below — but worth revisiting if any of them become
-load-bearing.
+so Contact/Reviews writes remain unauthenticated. Left as-is because
+neither is in the v1 checklist — see "Modules with no use in v1" below
+— but worth revisiting if either becomes load-bearing. (The Newsletter
+module this used to also cover was deleted 2026-07-18 — see below.)
 
 ## Confirmed defects (re-verified live, 2026-07-10, after the `main` merge)
 
@@ -652,8 +651,6 @@ Exist in the codebase, fully working, but called by nothing in the v1
 - **Wishlist** (`/api/wishlist`) — not in v1 *or* v1.1 checklist at all.
 - **Product Reviews** (`/api/reviews`) — not in v1 *or* v1.1 checklist at
   all.
-- **Newsletter** (`/api/newsletter`) — not in v1 *or* v1.1 checklist at
-  all.
 - **Order** (`/api/orders`) — v1.1 commerce, not v1.
 - **Notification** (`/api/notifications`) — v1.1 (FCM), not v1. Partial
   plumbing landed in the `main` merge: `firebase-admin` is now a `pom.xml`
@@ -688,8 +685,20 @@ Exist in the codebase, fully working, but called by nothing in the v1
 
 **Decision (2026-07-10): keep all of these.** None get deleted — a
 dormant, unused controller is genuinely harmless (nothing calls it, no
-runtime cost) as long as it *compiles* and doesn't itself have bugs. That
-distinction matters and just came up in practice: `WishlistService` had a
+runtime cost) as long as it *compiles* and doesn't itself have bugs.
+
+**Exception, 2026-07-18: Newsletter was deleted entirely** (entity,
+repository, service, controller, DTO — `/api/newsletter/**` no longer
+exists). It was never in the v1 or v1.1 checklist and, unlike the
+others, was pure bookkeeping (subscribe/unsubscribe an email address)
+with no actual send/campaign mechanism ever built — nothing else in the
+codebase referenced it, so removing it didn't touch anything else.
+Also cleaned up the now-orphaned `.requestMatchers("/api/newsletter/**")
+.permitAll()` rule in `SecurityConfig`. This is a deliberate departure
+from the "keep dormant modules" decision above, made because Newsletter
+had no path to ever becoming load-bearing without new work anyway.
+
+That distinction matters and just came up in practice: `WishlistService` had a
 broken method (`Product.getImageUrl()`, which doesn't exist on `Product`)
 that failed the build for the *entire* repo, even though nothing in v1 or
 v1.1 calls Wishlist — Java compiles everything as one unit, so a bug in
