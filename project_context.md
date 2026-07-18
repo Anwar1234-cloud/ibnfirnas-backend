@@ -16,26 +16,27 @@ One backend serves both clients — no separate backend per client; see
   `fb9aa43`), and a security-hardening pass on Order/Notification/
   Company controllers (`1889701`). `origin/main` is currently at
   `9b8b101`.
-- `developer-2` — synced with `main` again on 2026-07-16 by merging
-  `origin/main` in (`0e30e3c`), reconciling ~7 commits of divergence.
-  Also carries this dev's own work since the 2026-07-10 sync: the
-  Gallery password-hash leak fix, the `GET /api/auth/me` password leak
-  fix, Cloudinary cleanup on gallery delete, the CORS-conflict
-  consolidation (`CORS_ALLOWED_ORIGINS` env var), and a Service `PUT`
-  endpoint (later superseded by `origin/main`'s validated version during
-  the merge). A follow-up audit after the merge found 3 more open
-  issues — see `architecture.md`'s "Confirmed defects" 1c/1d/1e and
-  `changelog.md`'s 2026-07-16 entry. **`developer-2` is 9 commits ahead
-  of `origin/developer-2` as of this writing — merged and committed
-  locally, not yet pushed.** On top of that, further local work landed
-  2026-07-17 and is verified live: centralized `401`/`403` JSON error
-  handling and a `JwtAuthenticationFilter` fix for deleted-user tokens
-  (see `changelog.md`'s 2026-07-17 entry) — still not staged or
-  committed, but confirmed working against the running instance.
+- `developer-2` — synced with `main` twice: first on 2026-07-16
+  (`0e30e3c`), then again on 2026-07-18 (`8e295cf`) after `origin/main`
+  picked up a real test suite (`AuthControllerTest` + 5 service test
+  classes, 36 tests) from `develop`/`feature/product-api`. Also carries
+  this dev's own work: the Gallery/`auth/me` password-leak fixes,
+  Cloudinary cleanup on gallery delete, the CORS-conflict consolidation,
+  a Service `PUT` endpoint (superseded by `origin/main`'s validated
+  version during the first merge), centralized `401`/`403` JSON error
+  handling (`RestAuthenticationEntryPoint`/`RestAccessDeniedHandler`),
+  the `/me`+`/refresh-token` 500-vs-401 fix (reconciled with an
+  independent fix that arrived via the second merge — kept both,
+  layered), and — 2026-07-18 — a full rebuild of forgot-password onto
+  phone OTP (replacing the old email-token flow) plus removing the
+  email-OTP path entirely (SMS-only now). Everything through `8e295cf`
+  is pushed to `origin/developer-2`; the forgot-password/OTP/Contact
+  rework is local, uncommitted as of this writing. A follow-up audit
+  after the first merge found 2 issues still open — see
+  `architecture.md`'s "Confirmed defects" 1c/1d.
   Also: `*.md` was found to be gitignored repo-wide, meaning this whole
   doc set had never actually been tracked by git; fixed via explicit
-  `.gitignore` exceptions, but the docs themselves are still untracked
-  pending a `git add`.
+  `.gitignore` exceptions, docs are now tracked and committed.
 - `origin` also has `develop`, `feature/authentication`,
   `feature/product-api` — `develop` and `feature/product-api` are where
   the OTP feature and controller security fixes originated before
@@ -90,14 +91,15 @@ foundation.
 ### Backend — v1
 - Auth module: JWT, BCrypt, roles
 - **User module: register/login/profile (added to v1)**
-- **OTP verification (email + SMS via Twilio) — built 2026-07-15, not
-  yet in v1 scope or wired into the auth flows.** Given the Saudi
-  market and the app's phone-number-first registration, this is a
-  strong candidate to gate phone verification at registration (see
-  `changelog.md`/`architecture.md` for the API contract) — but it needs
-  a scope decision: does registration require OTP verification before
-  v1 ships, or does it stay optional/deferred? Not yet confirmed with
-  the client.
+- **OTP verification (SMS via Twilio, phone-only as of 2026-07-18) — now
+  wired into forgot-password**, replacing the old email-token reset flow.
+  Registration/login still don't gate on it. Given the Saudi market and
+  the app's phone-number-first registration, this remains a strong
+  candidate to also gate phone verification at registration (see
+  `changelog.md`/`architecture.md` for the API contract) — that part of
+  the scope decision (does registration require OTP verification before
+  v1 ships, or stay optional/deferred?) is still not confirmed with the
+  client. The forgot-password piece is decided and built.
 - Product API: full CRUD + Cloudinary image storage
 - Service API: full CRUD + Cloudinary image storage
 - Gallery API: upload/delete/list

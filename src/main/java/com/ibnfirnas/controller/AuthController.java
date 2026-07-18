@@ -38,18 +38,14 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
-    @PostMapping("/forgot-password")
-    public ResponseEntity<ApiResponse<Void>> forgotPassword(
-            @Valid @RequestBody ForgotPasswordRequest request) {
-        passwordResetService.forgotPassword(request.getEmail());
-        return ResponseEntity.ok(ApiResponse.success(
-                "Password reset email sent", null));
-    }
-
+    // Forgotten-password flow is phone-OTP based: call POST /api/otp/send
+    // with {phone, purpose: "FORGOT_PASSWORD"} to request a code, then this
+    // endpoint to verify it and set the new password in one step.
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<Void>> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
-        passwordResetService.resetPassword(request.getToken(), request.getNewPassword());
+        passwordResetService.resetPassword(
+                request.getPhone(), request.getOtp(), request.getNewPassword());
         return ResponseEntity.ok(ApiResponse.success("Password reset successful", null));
     }
 

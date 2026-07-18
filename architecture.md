@@ -88,13 +88,13 @@ below for what's still open.
 
 | Module | v1 needs | Current state | Gap |
 |---|---|---|---|
-| Auth | Register, login, JWT, roles | `AuthController` has register/login/forgot-password/reset-password/refresh-token/me. `SecurityConfig` uses BCrypt + stateless JWT. `UserRole` = `ROLE_USER`/`ROLE_ADMIN`. | `GET /me` still leaks the password hash (see defects) — the rest is solid. |
+| Auth | Register, login, JWT, roles | `AuthController` has register/login/reset-password(phone OTP)/refresh-token/me. `SecurityConfig` uses BCrypt + stateless JWT. `UserRole` = `ROLE_USER`/`ROLE_ADMIN`. | **Fixed** — no more password leak on `/me`, no more 500-vs-401 on `/me`/`refresh-token`, forgot-password rebuilt on phone OTP (2026-07-18, no more email enumeration). |
 | User profile | Get/update profile | `ProfileController` GET/PUT `/api/profile`, now returns a `UserResponse` DTO, password change flow added. | **Fixed** — no more entity leak here. |
 | Dashboard | Product/service/inquiry counts | `DashboardService.getStats()` returns totalUsers, totalProducts, totalOrders, totalInquiries, totalServices. | None. |
 | Product | Full CRUD + image upload (Cloudinary) | `ProductController`/`ProductService` now have full GET/POST/PUT/DELETE via `ProductRequest`/`ProductResponse`. `Product.images` is `FetchType.EAGER` now (fixes the lazy-load crash). | **Still missing:** pagination on the catalog GET, actual Cloudinary upload (still no image upload wiring — `ProductRequest` doesn't carry a file). |
 | Service | Full CRUD | `ServiceController` now has GET (all/featured/by-id) + POST create + `PUT /{id}` update (added 2026-07-15, superseded by `origin/main`'s `ServiceRequest`-validated version in the 2026-07-16 merge) + DELETE. | **Fixed** — full CRUD complete. |
 | Gallery | Upload/delete/list | `GalleryController` has GET/POST/DELETE, returning a `GalleryResponse` DTO as of 2026-07-15 (no more raw-entity leak). POST still takes a raw JSON `Gallery` body (no multipart) — the admin panel is expected to call `POST /api/upload/image` first to get a Cloudinary URL, then POST that URL here, same pattern Product uses. DELETE now calls `CloudinaryService.deleteImage()` before removing the row (2026-07-15), so deletes no longer orphan Cloudinary assets. | Functionally complete for v1; still no direct multipart upload on `/api/gallery` itself (relies on the generic `/api/upload/image` two-step flow). |
-| OTP | Not in original v1 checklist | New as of 2026-07-15 (`origin/main`): `OtpController`/`OtpService`, email OTP (DB-tracked) and SMS OTP (Twilio Verify). `POST /api/otp/send` / `POST /api/otp/verify`, both public. | **Standalone, not integrated** — not called by `AuthController`'s register/login/forgot-password flows yet. See "OTP module" section below. |
+| OTP | Not in original v1 checklist | `OtpController`/`OtpService`, **phone-only as of 2026-07-18** (email OTP path removed entirely, see below). `POST /api/otp/send` / `POST /api/otp/verify`, both public, delegate to Twilio Verify. | **Wired into forgot-password** (`POST /api/auth/reset-password` now verifies a phone OTP and sets the new password in one call) — registration/login OTP still not gating anything, remains optional/unused by those flows. See "OTP module" section below. |
 | Company | GET public / PUT admin + social links | `CompanyController` has GET/POST/PUT (`PUT /api/company/{id}`). Added `websiteUrl`/`facebookUrl`/`instagramUrl`/`twitterUrl` 2026-07-10. | Functionally complete for v1 — still unauthenticated writes, see security gap. |
 | Inquiry | POST public / GET + status update admin | `InquiryController` has POST/GET list/GET by id/PUT resolve/GET my. `POST` now requires authentication (any role) as of 2026-07-10 — a **scope change**, no longer "public" per the v1 brief; rest still `hasRole("ADMIN")`, plus a new `GET /my` (authenticated) so a user can see their own inquiries. | **Behavior changed by decision, not defect** — worth confirming with the client. |
 | Image storage | Cloudinary | `FileStorageService` still saves to local `./uploads`, unused by any controller now. No Cloudinary SDK in `pom.xml`. `Gallery.cloudinaryPublicId` column exists as of 2026-07-10 (Hibernate `ddl-auto: update` added it, verified live). | **Not started** — schema is ready, the actual `CloudinaryService` + SDK integration still needs building. |
@@ -113,10 +113,9 @@ version are marked.
 |---|---|---|---|---|
 | POST `/register` | public | `{fullName, email, password, phone}` | `{token, email, fullName, role}` | Mobile app |
 | POST `/login` | public | `{email, password}` | `{token, email, fullName, role}` | Mobile app, Admin panel |
-| POST `/forgot-password` | public | `{email}` | `void` | Mobile app |
-| POST `/reset-password` | public | `{token, newPassword}` | `void` | Mobile app |
-| POST `/refresh-token` | authenticated | — (Bearer token) | `{accessToken}` | Both |
-| GET `/me` | authenticated | — | full `User` entity **(still leaks password hash — unchanged, see defects)** | Both |
+| POST `/reset-password` | public | **Rebuilt 2026-07-18**: `{phone, otp, newPassword}` — verifies a phone OTP via `OtpService` and sets the password in one call. `POST /forgot-password` no longer exists; request the code via `POST /api/otp/send {phone, purpose: "FORGOT_PASSWORD"}` instead. | `void` | Mobile app |
+| POST `/refresh-token` | `.authenticated()` — **fixed 2026-07-18**, carved out of the `permitAll` `/api/auth/**` | — (Bearer token) | `{accessToken}` | Both |
+| GET `/me` | `.authenticated()` — **fixed 2026-07-18** | — | `UserResponse` DTO, no password | Both |
 
 ### Profile — `/api/profile` — **fixed**
 | Method & path | Auth (actual) | Request | Response | Consumer |
@@ -168,19 +167,37 @@ flat `serviceType` field).
 | POST `/` | `hasRole("ADMIN")` | raw JSON `Gallery` body — **not multipart**; admin panel calls `POST /api/upload/image` first to get a Cloudinary URL, then posts that URL here | `GalleryResponse` | Admin panel | Built, verified live with an admin token |
 | DELETE `/{id}` | `hasRole("ADMIN")` | — | `void` | Admin panel | Built — **now also deletes the Cloudinary asset** via `CloudinaryService.deleteImage()` before removing the row (2026-07-15), no longer orphans files |
 
-### OTP — `/api/otp` — **new 2026-07-15, standalone**
+### OTP — `/api/otp` — **phone-only as of 2026-07-18, wired into forgot-password**
 | Method & path | Auth (actual) | Request | Response | Consumer | Status |
 |---|---|---|---|---|---|
-| POST `/send` | public | `SendOtpRequest {email? \| phone?, purpose}` — `purpose` one of `REGISTRATION`/`LOGIN`/`FORGOT_PASSWORD`, case-insensitive here | `void`, masked-destination message | Mobile app | Built. Email OTP: 6-digit code generated + stored in-app, 10-min TTL. SMS OTP: delegated entirely to Twilio Verify, no local tracking. |
-| POST `/verify` | public | `VerifyOtpRequest {email? \| phone?, otp, purpose}` — **`purpose` must be exact uppercase here, unlike `/send`** (no `.toUpperCase()` before `OtpPurpose.valueOf()` — lowercase throws an unhandled exception → `500`, not a clean `400`) | `boolean` | Mobile app | Built. Email: 3-attempt cap, checked against the stored code. SMS: delegates to Twilio's `VerificationCheck`. |
+| POST `/send` | public | `SendOtpRequest {phone, purpose}` — `purpose` one of `REGISTRATION`/`LOGIN`/`FORGOT_PASSWORD`, case-insensitive | `void`, masked-phone message | Mobile app | Built. Delegates entirely to Twilio Verify SMS — no local DB tracking at all. |
+| POST `/verify` | public | `VerifyOtpRequest {phone, otp, purpose}` — **`purpose` case-sensitivity bug fixed 2026-07-18**, now uppercases like `/send` before parsing | `boolean` | Mobile app | Built. Delegates to Twilio's `VerificationCheck`. `purpose` is validated for a well-formed value but not actually passed to Twilio (see caveat below). |
 
-**Not integrated with `AuthController`** — nothing in `register`/`login`/
-`forgot-password` calls `OtpService`. It's a standalone verify-a-code
-utility right now; someone still needs to wire it into the actual
-account flows (e.g. register → send OTP → verify → then call
-`/api/auth/register`). `.env.example` also hasn't been updated with the
+**Email OTP removed entirely 2026-07-18** — `SendOtpRequest`/`VerifyOtpRequest`
+no longer have an `email` field, `phone` is the sole required
+identifier. The email-OTP-only infrastructure it needed
+(`OtpVerification` entity, `OtpVerificationRepository`, `OtpType` enum,
+`EmailService.sendOtpEmail()`) was deleted rather than left dormant,
+since nothing could reach it anymore.
+
+**Now wired into `POST /api/auth/reset-password`** (forgot-password
+flow) — see the Auth table above. Registration/login still don't call
+`OtpService` at all; OTP verification isn't a gate on those flows, it's
+only used for password reset right now.
+
+**Known caveat, not fixed**: Twilio Verify doesn't track *why* a code
+was requested — `purpose` is app-level bookkeeping only, not enforced
+by Twilio. A valid SMS code obtained via a `LOGIN` or `REGISTRATION`
+send could technically also be used to reset a password through
+`/reset-password`, since `OtpService.verifySmsOtp()` doesn't take a
+purpose parameter at all. Fixing this properly would mean tracking SMS
+OTP sends locally too (mirroring how the old email path worked) — out
+of scope for the forgot-password rework, worth revisiting if it
+matters for the threat model.
+
+`.env.example` still hasn't been updated with the
 `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_VERIFY_SERVICE_SID`
-vars `application.yaml` now requires.
+vars `application.yaml` requires.
 
 ### Company — `/api/company` — **write endpoints added, social/website fields added**
 | Method & path | Auth (actual) | Request | Response | Consumer | Status |
@@ -567,26 +584,26 @@ ID. Fix: check the order's owning user against
 `@AuthenticationPrincipal` (or require `hasRole("ADMIN")` for
 non-owners) before returning.
 
-### 1e. NEW — `POST /api/auth/refresh-token` (and originally `/me`) throws 500 instead of 401 when called anonymously
-Found in the 2026-07-16 audit; the `/me` half was fixed 2026-07-15,
-**the `refresh-token` half is still open**. Both endpoints sit under
-the blanket `.requestMatchers("/api/auth/**").permitAll()` matcher but
-rely on `@AuthenticationPrincipal` internally. An anonymous call to
-either doesn't get rejected by Spring Security (it's `permitAll`) — it
-hits `userDetails.getUsername()` on a `null`, throws a
-`NullPointerException`, and `GlobalExceptionHandler`'s catch-all turns
-it into a `500` (leaking the exception message) instead of a `401`.
-Fix: give `/api/auth/me` and `/api/auth/refresh-token` their own
-`.authenticated()` matchers instead of folding them into the
-`permitAll` `/api/auth/**` pattern.
-
-Note: this is a different failure mode than the 401/403 handler work
-below — those only run when Spring Security itself rejects a request
-(no/invalid token on a matcher that requires auth). `/refresh-token`'s
-matcher is `permitAll`, so Spring Security lets the request through and
-never invokes `RestAuthenticationEntryPoint` at all; the crash happens
-inside the controller. The entry-point/access-denied work doesn't fix
-this one — it still needs its own matcher change.
+### 1e. `POST /api/auth/refresh-token` (and `/me`) threw 500 instead of 401 when called anonymously — **fixed 2026-07-18**
+Both endpoints sat under the blanket `.requestMatchers("/api/auth/**").permitAll()`
+matcher but relied on `@AuthenticationPrincipal` internally, so an
+anonymous call NPE'd on a null principal instead of getting a clean
+`401`. Fixed at two layers, defense in depth:
+- `SecurityConfig` now carves `GET /api/auth/me` and `POST
+  /api/auth/refresh-token` out of the blanket `permitAll`, requiring
+  `.authenticated()` — Spring Security itself rejects an anonymous call
+  via `RestAuthenticationEntryPoint` before the controller ever runs.
+- `AuthController` also keeps an explicit `if (userDetails == null)
+  throw new BadCredentialsException(...)` guard in both methods
+  (originating from an independent fix on `origin/main`, kept
+  deliberately rather than treated as redundant) — `GlobalExceptionHandler`
+  already has a `BadCredentialsException` handler that maps to `401`.
+  This layer matters in contexts where the full `SecurityConfig` filter
+  chain doesn't run, e.g. `AuthControllerTest` uses
+  `@AutoConfigureMockMvc(addFilters = false)` specifically to test the
+  controller in isolation — without the controller-level guard, that
+  test (`getMe_WithoutToken_Returns401`) fails with a `500`. Verified:
+  all 36 tests pass with both layers in place.
 
 ### 2. `LazyInitializationException` — **fixed**
 `Product.images` and `Category.children` are now `fetch = FetchType.EAGER`
@@ -655,6 +672,13 @@ Exist in the codebase, fully working, but called by nothing in the v1
   (phone/email/address from `Company` + WhatsApp deep link), not a form —
   so this controller likely isn't needed for v1 at all. **Worth
   confirming with the client** rather than assuming.
+  **Fixed 2026-07-18**: the notification email used to go to the
+  *submitter* (`sendInquiryConfirmation(request.getEmail(), ...)` — an
+  auto-reply to whoever filled out the form, not a notification to
+  anyone on the team). Now sends to `Company.email` (the admin/company
+  inbox, same field the public "About/Contact" screens already read)
+  with the submitter's name/email/phone/message in the body, via a new
+  `EmailService.sendContactNotificationToAdmin()`.
 - **Banner** (`/api/banners`) — a full carousel entity (title, subtitle,
   CTA, display order). The v1 admin panel checklist doesn't list "banner
   management" as a module, and the v1 mobile home screen says "company
@@ -702,9 +726,13 @@ that's a scope question now, not a keep-or-delete one.
   going to a shared/staging DB.
 
 ## Next steps (backend, to unblock v1)
-Re-ordered 2026-07-16. Items 1–6 from the previous (2026-07-10) list are
-now done — see `changelog.md`'s 2026-07-15/16 entries. Current open
-list:
+Re-ordered 2026-07-18. Everything about the auth-leak bugs, CORS, the
+401/403 handlers, and the forgot-password rework is now done — see
+`changelog.md`'s 2026-07-15 through 2026-07-18 entries. A real test
+suite also landed via the `origin/main` merge (`AuthControllerTest`,
+`AuthServiceTest`, `CartServiceTest`, `InquiryServiceTest`,
+`OrderServiceTest`, `ProductServiceTest` — 36 tests, all passing).
+Current open list:
 
 1. **Fix `GET /api/notifications`'s password-hash leak and missing auth
    gate** (defect 1c) — highest priority open item now, same bug class
@@ -713,29 +741,14 @@ list:
    least authenticated + role-appropriate).
 2. **Fix the `GET /api/orders/{id}` IDOR** (defect 1d) — add an
    ownership check against the caller before returning an order.
-3. **Fix `POST /api/auth/refresh-token`'s 500-vs-401 bug** (defect 1e)
-   — same fix pattern already applied to `/me`: give it its own
-   `.authenticated()` matcher instead of relying on the blanket
-   `/api/auth/**` `permitAll`. Note: the new `RestAuthenticationEntryPoint`
-   (see "Security gap" above) does not cover this — that only fires
-   when `SecurityConfig` itself rejects a request, and `refresh-token`
-   is `permitAll`, so it still crashes inside the controller.
-3b. **Commit and push the pending 401/403 error-handler work** —
-   `RestAuthenticationEntryPoint`, `RestAccessDeniedHandler`, and the
-   `JwtAuthenticationFilter` deleted-user-token fix are all currently
-   local, uncommitted changes on `developer-2` as of 2026-07-16. Verify
-   live (a request with no token against an admin-only endpoint should
-   now return JSON, not an empty body) before committing, then update
-   `frontend-integration-spec.md` §1 to drop the "not yet pushed"
-   caveat once it's confirmed on the remote.
-4. **Wire the new OTP module into the actual auth flows** — right now
-   `POST /api/otp/send`/`verify` are standalone; nothing in
-   `AuthController` calls them. Decide whether OTP verification gates
-   registration/login or stays optional, and update
-   `.env.example` with the `TWILIO_*` vars `application.yaml` now
-   requires. Also fix the `purpose` case-sensitivity inconsistency
-   between `/send` (uppercases it) and `/verify` (doesn't — throws a
-   raw `500` on lowercase input).
+3. **SMS OTP `purpose` isn't actually enforced** — Twilio Verify has no
+   concept of it, so a code sent for `LOGIN` could technically be reused
+   to reset a password via `/api/auth/reset-password`. See the "OTP
+   module" section above. Would need local tracking of SMS OTP sends to
+   close, out of scope for now.
+4. Update `.env.example` with the `TWILIO_ACCOUNT_SID`/
+   `TWILIO_AUTH_TOKEN`/`TWILIO_VERIFY_SERVICE_SID` vars
+   `application.yaml` requires — still missing.
 5. **Confirm the inquiry-submission auth change with the client** —
    `POST /api/inquiries` now requires login (2026-07-10 decision),
    removing guest inquiry submission from the v1-confirmed feature
@@ -755,10 +768,7 @@ list:
    `"Something went wrong: " + ex.getMessage()` with a `500` for any
    unhandled exception — leaks internal exception detail to any client.
    Worth tightening to a generic message before production.
-10. `PasswordResetService.forgotPassword()` lets an attacker enumerate
-    registered emails (distinguishable error for unregistered
-    addresses on the public endpoint).
-11. `application.yaml` has `org.springframework.security`/
+10. `application.yaml` has `org.springframework.security`/
     `com.ibnfirnas` at `DEBUG` and `show-sql: true` with no
     dev/prod profile split — would ship to production as-is.
 

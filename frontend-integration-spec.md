@@ -7,9 +7,12 @@ Verified live against the running backend on `developer-2`, 2026-07-10
 (updated later the same day for the Inquiry auth change and the new
 `GET /api/inquiries/my` endpoint — see §1 and §9). Updated 2026-07-16
 for the Gallery/`auth/me` leak fixes and the new OTP module. Updated
-again 2026-07-17: the centralized 401/403 JSON error responses and the
-`JwtAuthenticationFilter` stale-token fix are now verified live — see
-§1 and §9.
+2026-07-17 for the centralized 401/403 JSON error responses and the
+`JwtAuthenticationFilter` stale-token fix. Updated again 2026-07-18: the
+forgot-password flow was rebuilt entirely on phone OTP (no more email
+step, `POST /api/auth/forgot-password` is gone), OTP itself is now
+phone-only (email support removed), and `/me`/`refresh-token` no longer
+500 on an anonymous call — see §1, §6, and §9.
 
 Companion docs: [architecture.md](architecture.md) (backend detail),
 [project_context.md](project_context.md) (v1 scope), [changelog.md](changelog.md).
@@ -53,10 +56,8 @@ later:
   `401 → {"success": false, "message": "Authentication required", "data": null}`,
   `403 → {"success": false, "message": "Access denied", "data": null}`.
   Verified live: `response.data.message` is now safe to read for every
-  error status, no more special-casing 401/403. (Still local/uncommitted
-  on `developer-2` as of this writing — confirmed working against the
-  running instance, just not yet in a pushed commit — see
-  `changelog.md`'s 2026-07-17 entry.)
+  error status, no more special-casing 401/403. Committed and pushed —
+  see `changelog.md`'s 2026-07-17 entry.
 
 ### Auth
 
@@ -92,21 +93,28 @@ later:
 ```
 Response: identical shape to register's `data`.
 
-**`POST /api/auth/forgot-password`**
+**Forgot password — rebuilt 2026-07-18, phone OTP, no email involved.**
+`POST /api/auth/forgot-password` **no longer exists.** The flow is now
+two calls:
+
+1. **`POST /api/otp/send`** — request a code (see §OTP below for the
+   full contract):
+```json
+{ "phone": "+966501234567", "purpose": "FORGOT_PASSWORD" }
+```
+2. **`POST /api/auth/reset-password`** — verify the code and set the new
+   password in one call:
 ```json
 // Request
-{ "email": "ahmed@example.com" }
+{ "phone": "+966501234567", "otp": "123456", "newPassword": "newPassword123" }
 ```
 ```json
 // Response
-{ "success": true, "message": "Password reset email sent", "data": null }
+{ "success": true, "message": "Password reset successful", "data": null }
 ```
-
-**`POST /api/auth/reset-password`**
-```json
-// Request
-{ "token": "<from-email-link>", "newPassword": "newPassword123" }
-```
+No email step anywhere in this flow now — **the Forgot Password screen
+needs a phone number field, not an email field**, and a code-entry step
+between "request" and "submit new password."
 
 **`POST /api/auth/refresh-token`** — no body, `Authorization: Bearer <token>` header only.
 ```json
@@ -347,49 +355,54 @@ new 2026-07-10
 Good fit for a "My Inquiries" list in the Profile tab, showing status
 and past submissions.
 
-### OTP verification (new 2026-07-15, no auth required)
+### OTP verification (phone-only as of 2026-07-18, no auth required)
 
-**⚠️ Not yet wired into register/login/forgot-password on the backend**
-— these endpoints exist and work standalone, but calling `/verify`
-doesn't itself create an account or log anyone in. If the client wants
-phone/email verification as part of registration, that flow (send →
-user enters code → verify → then call the actual `/auth/register` or
-`/auth/login`) needs to be built on both sides; nothing connects them
-automatically today.
+**⚠️ Email OTP has been removed entirely** — `phone` is now the only
+identifier field on both endpoints. If you built anything against an
+`email` field on `/api/otp/send` or `/verify`, drop it; sending one now
+does nothing (it's not in the request DTO anymore, so it'll just be
+ignored or rejected by strict JSON parsing depending on your client).
+
+**Wired into forgot-password** (see the Auth section above) — that's
+the one flow this actually gates today. Registration/login still don't
+call it; calling `/verify` on its own doesn't create an account or log
+anyone in.
 
 **`POST /api/otp/send`**
 ```json
-// Request — send EITHER email or phone, not both (email wins if both given)
-{ "email": "ahmed@example.com", "purpose": "REGISTRATION" }
+// Request
+{ "phone": "+966501234567", "purpose": "FORGOT_PASSWORD" }
 ```
 `purpose` is one of `REGISTRATION` / `LOGIN` / `FORGOT_PASSWORD`,
-case-insensitive on this endpoint.
+case-insensitive.
 ```json
 // Response 200
-{ "success": true, "message": "OTP sent to a***@example.com", "data": null }
+{ "success": true, "message": "OTP sent to +966******34", "data": null }
 ```
-Email OTPs are a 6-digit code generated and tracked server-side (10-min
-TTL). SMS OTPs are generated and delivered entirely by Twilio Verify —
-the backend never sees the actual code for the SMS path.
+Delegated entirely to Twilio Verify SMS — the backend never sees or
+stores the actual code.
 
 **`POST /api/otp/verify`**
 ```json
 // Request
-{ "email": "ahmed@example.com", "otp": "123456", "purpose": "REGISTRATION" }
+{ "phone": "+966501234567", "otp": "123456", "purpose": "FORGOT_PASSWORD" }
 ```
-**⚠️ `purpose` must be sent in exact uppercase here** — unlike `/send`,
-this endpoint does not normalize case, and a lowercase value currently
-throws an unhandled server error (`500`) instead of a clean validation
-error. Always send `REGISTRATION`/`LOGIN`/`FORGOT_PASSWORD` exactly as
-shown.
+**Case-sensitivity bug fixed 2026-07-18** — `purpose` is now
+case-insensitive on `/verify` too, matching `/send`.
 ```json
 // Response 200
-{ "success": true, "message": "Email OTP verified", "data": true }
+{ "success": true, "message": "SMS OTP verified", "data": true }
 ```
-On failure, `success: false` with a message like `"Invalid OTP"`,
-`"OTP expired. Request a new one"`, or `"Too many attempts. Please
-request a new OTP"` (email path only — SMS attempt/expiry limits are
-enforced by Twilio, not documented here).
+On failure, `success: false` with a message like `"Invalid OTP"` or
+`"OTP verification failed"` — attempt/expiry limits are enforced by
+Twilio, not documented here.
+
+**Known caveat**: Twilio doesn't actually enforce `purpose` — it's
+app-level bookkeeping only. A code sent for `LOGIN` would technically
+still verify successfully if submitted with `purpose: "FORGOT_PASSWORD"`.
+Not currently exploitable through any built UI flow, but don't rely on
+`purpose` as a security boundary if you're designing something new
+around this.
 
 ---
 
@@ -650,9 +663,13 @@ check secure storage for a token and validate it (Phase 2+, once wired)
   → on submit, store token + role → navigate to Main tabs.
 - **Register** — fullName, email, password (≥6 chars), phone (optional)
   → response includes a token, so auto-login, no separate login call.
-- **Forgot Password** — email → generic "check your email" message
-  regardless of whether the account exists.
-- **Reset Password** — token (from email link) + new password.
+- **Forgot Password** — **rebuilt 2026-07-18**: phone number field →
+  `POST /api/otp/send {phone, purpose: "FORGOT_PASSWORD"}` → code-entry
+  screen. No more email step, no more "check your email" message — the
+  code arrives via SMS.
+- **Reset Password** — phone (carried over from the previous screen) +
+  the entered OTP + new password → `POST /api/auth/reset-password
+  {phone, otp, newPassword}` verifies and resets in one call.
 
 ### Home (tab)
 - Sections: company banner (`Company.bannerUrl`), featured products
@@ -763,16 +780,22 @@ Linking.openURL(
   with an unhandled exception; `JwtAuthenticationFilter` now catches
   this, clears the security context, and lets the request continue as
   anonymous (so a protected endpoint correctly falls through to a clean
-  401/403 instead of a 500). Verified live 2026-07-17. Uncommitted as of
-  this writing (local work on `developer-2`, not yet pushed).
+  401/403 instead of a 500). Fixed 2026-07-17.
 - New centralized `401`/`403` JSON error responses (see §1) —
   `RestAuthenticationEntryPoint`/`RestAccessDeniedHandler` replace
   Spring Security's default empty-body responses with the same
-  `{success, message, data}` envelope used everywhere else. Verified
-  live 2026-07-17 against `/api/inquiries`, `/api/inquiries/my`, and
-  `/api/inquiries` with anonymous/`ROLE_USER`/`ROLE_ADMIN` callers — safe
-  to build against now. Uncommitted as of this writing (local work on
-  `developer-2`, not yet pushed).
+  `{success, message, data}` envelope used everywhere else. Fixed
+  2026-07-17 — safe to build against now.
+- **`GET /api/auth/me` and `POST /api/auth/refresh-token` no longer
+  500 on an anonymous call** — both now return a clean `401`. Fixed
+  2026-07-18.
+- **Forgot-password rebuilt on phone OTP** — see the Auth section in
+  §1 and the "Forgot Password"/"Reset Password" screen notes in §6.
+  `POST /api/auth/forgot-password` is gone; the flow is now
+  `/api/otp/send` → `/api/auth/reset-password {phone, otp,
+  newPassword}`. Fixed 2026-07-18.
+- **OTP is phone-only now** — the `email` field is gone from both
+  `/api/otp/send` and `/verify`. Fixed 2026-07-18.
 
 **Still open:**
 - **Inquiry submission still requires login (changed 2026-07-10)** —
@@ -784,9 +807,9 @@ Linking.openURL(
   (Notification is v1.1/admin-only), but flagging in case the mobile
   team ever touches it: don't build against this response shape until
   it's fixed backend-side.
-- **New OTP endpoints (§1) exist but aren't wired into
-  register/login/forgot-password** — don't assume calling
-  `/api/otp/verify` does anything beyond confirming the code matched.
+- **OTP (§1) still isn't wired into register/login** — only
+  forgot-password gates on it today. Don't assume calling
+  `/api/otp/verify` on its own creates an account or logs anyone in.
 - **No pagination** on Product/Service/Gallery lists — structure hooks
   so adding `page`/`size` later is a data-layer change, not a UI
   rewrite.

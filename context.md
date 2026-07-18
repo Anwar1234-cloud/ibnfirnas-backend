@@ -36,7 +36,7 @@ E-commerce: `User`, `Product` (+ `ProductImage`, `Category`, `ProductReview`),
 `Cart`/`CartItem`, `Order`/`OrderItem`, `Wishlist`.
 Site/company content: `Company`, `ServiceEntity`, `Gallery`, `Banner`.
 Lead gen / comms: `Inquiry`, `Newsletter`, `Notification`, `DeviceToken`
-(FCM push tokens), `PasswordResetToken`.
+(FCM push tokens).
 
 Not all of these are in scope for v1 — Cart, Wishlist, Product Reviews,
 Newsletter, Order, and Notification aren't called by anything in the v1
@@ -46,19 +46,29 @@ for the actual v1 scope and [architecture.md](architecture.md) for the
 full module-by-module breakdown and reasoning.
 
 ## Auth
-JWT-based (`io.jsonwebtoken` / jjwt 0.11.5). Login/register/forgot-password/
-reset-password live in `AuthController` + `AuthService` +
-`PasswordResetService`. Token validation via `JwtAuthenticationFilter` →
-`JwtTokenProvider`, user lookup via `CustomUserDetailsService`.
+JWT-based (`io.jsonwebtoken` / jjwt 0.11.5). Login/register live in
+`AuthController` + `AuthService`. Token validation via
+`JwtAuthenticationFilter` → `JwtTokenProvider`, user lookup via
+`CustomUserDetailsService`. `GET /me` and `POST /refresh-token` require
+`.authenticated()` in `SecurityConfig` (fixed 2026-07-18 — previously
+sat under a blanket `permitAll`, see defects below).
 
-**OTP verification** (added 2026-07-15, `OtpController`/`OtpService`) is
-a separate, standalone module — email OTP (generated + tracked in our
-DB, 10-min TTL) and SMS OTP (delegated to Twilio Verify via the new
-`twilio` SDK dependency and `TwilioConfig`). `POST /api/otp/send` and
-`POST /api/otp/verify` are public. It is **not called by anything in
-`AuthController`** yet — register/login/forgot-password don't check it.
-See `architecture.md`'s "OTP module" section for the full API contract
-and known gaps.
+**Password reset is phone-OTP based** (rebuilt 2026-07-18, replacing an
+email-token flow entirely): `POST /api/otp/send {phone, purpose:
+"FORGOT_PASSWORD"}` to request a code, then `POST
+/api/auth/reset-password {phone, otp, newPassword}` — verified via
+`OtpService`/`PasswordResetService`, no email involved.
+
+**OTP verification** (`OtpController`/`OtpService`, Twilio Verify SDK
+via `TwilioConfig`) is **phone/SMS-only as of 2026-07-18** — the email
+OTP path (and the `OtpVerification`/`OtpType` machinery that only
+existed to support it) was removed entirely. `POST /api/otp/send` and
+`POST /api/otp/verify` are public, stateless (Twilio tracks the code,
+nothing is stored locally). Wired into password reset; registration/
+login don't call it. See `architecture.md`'s "OTP module" section for
+the full API contract and known gaps (notably: Twilio doesn't enforce
+`purpose`, so a code sent for one purpose could technically verify for
+another).
 
 ## Configuration & secrets
 `application.yaml` now reads secrets from environment variables (previously
@@ -106,21 +116,9 @@ user's role fresh from the DB on every request rather than reading it
 from the JWT itself, so an already-issued token picks up the new role
 immediately.
 
-## Known runtime defects (updated 2026-07-17)
+## Known runtime defects (updated 2026-07-18)
 Full detail, reproduction steps, and fixes in `architecture.md`'s
 "Confirmed defects" section; dated history in `changelog.md`.
-
-**Fixed 2026-07-17:**
-- **Auth failure responses were an empty `403` body regardless of cause**
-  (missing token, invalid token, or wrong role all looked identical to a
-  client). Added `RestAuthenticationEntryPoint`/`RestAccessDeniedHandler`
-  — now `401`/`403` return the same JSON envelope as every other
-  response. See `architecture.md`'s "Auth error responses" note.
-- **A stale/deleted-user token could break `permitAll` (public)
-  endpoints**, not just protected ones — `JwtAuthenticationFilter` threw
-  an uncaught `UsernameNotFoundException` that aborted the whole filter
-  chain before Spring Security's authorization check ever ran. Now
-  caught; the request just proceeds as anonymous.
 
 **Still open:**
 - **`GET /api/notifications` — leaks the creating admin's password
@@ -130,22 +128,36 @@ Full detail, reproduction steps, and fixes in `architecture.md`'s
   most severe open issue in the backend.
 - **`GET /api/orders/{id}` has no ownership check (IDOR)** — any
   logged-in user can view any other user's order by ID.
-- **`POST /api/auth/refresh-token` throws a `500` instead of a `401`**
-  when called anonymously (same root cause `/me` had — sits under a
-  `permitAll` matcher but relies on `@AuthenticationPrincipal`
-  internally, so an anonymous call NPEs).
-- The new OTP module (`/api/otp/send`, `/api/otp/verify` — added
-  2026-07-15, see "Auth" below) is **not wired into
-  register/login/forgot-password**, and its `purpose` field is
-  case-sensitive on `/verify` but not `/send`, which can produce a raw
-  `500` instead of a clean `400`.
+- SMS OTP's `purpose` isn't actually enforced by Twilio — a code sent
+  for `LOGIN` could technically also verify for `FORGOT_PASSWORD`. See
+  the "Auth" OTP note above and `architecture.md`'s OTP module section.
 
-**In progress, uncommitted (2026-07-16):** `RestAuthenticationEntryPoint`
-/`RestAccessDeniedHandler` now give `401`/`403` responses a proper JSON
-body (previously empty) app-wide, and `JwtAuthenticationFilter` no
-longer crashes on a token referencing a deleted user. Local changes on
-`developer-2` only, not yet committed — see `architecture.md`'s
-"Security gap" section.
+**Fixed 2026-07-18:**
+- **`GET /api/auth/me` and `POST /api/auth/refresh-token` threw `500`
+  instead of `401` when called anonymously** — both sat under a
+  blanket `permitAll` matcher while relying on `@AuthenticationPrincipal`
+  internally. Fixed at two layers: `SecurityConfig` now requires
+  `.authenticated()` for both, and `AuthController` keeps a
+  `BadCredentialsException` guard too (needed for `AuthControllerTest`,
+  which deliberately bypasses the security filter chain to test the
+  controller in isolation).
+- **Forgot-password rebuilt on phone OTP**, replacing the old
+  email-token flow entirely — fixes the email-enumeration issue that
+  flow had (see "Auth" above).
+- **OTP `purpose` case-sensitivity bug** — `/verify` now uppercases the
+  input before parsing, matching `/send`.
+- **Contact form notification was going to the form submitter, not an
+  admin** — now emails `Company.email` with the submitter's details.
+- **Auth failure responses were an empty `403` body regardless of cause**
+  (missing token, invalid token, or wrong role all looked identical to a
+  client). Added `RestAuthenticationEntryPoint`/`RestAccessDeniedHandler`
+  — now `401`/`403` return the same JSON envelope as every other
+  response.
+- **A stale/deleted-user token could break `permitAll` (public)
+  endpoints**, not just protected ones — `JwtAuthenticationFilter` threw
+  an uncaught `UsernameNotFoundException` that aborted the whole filter
+  chain before Spring Security's authorization check ever ran. Now
+  caught; the request just proceeds as anonymous.
 
 **Fixed 2026-07-15:**
 - **`GET /api/gallery`'s public password-hash leak** — was fully
@@ -195,10 +207,10 @@ longer crashes on a token referencing a deleted user. Local changes on
   Spring profiles yet.
 - No CI config found in the repo.
 - `origin` also has `develop`, `feature/authentication`,
-  `feature/product-api` branches. `origin/main` had diverged
-  significantly from `developer-2` since the 2026-07-10 sync (a
-  teammate's OTP feature + security fixes landed there) — reconciled
-  again 2026-07-16 by merging `origin/main` into `developer-2`
-  (`0e30e3c`). See "Branches" in `project_context.md` for full detail.
-  `developer-2` is **9 commits ahead of `origin/developer-2`** as of
-  this writing — merge committed locally but **not yet pushed**.
+  `feature/product-api` branches. `origin/main` has diverged from
+  `developer-2` twice now (2026-07-10 and again by 2026-07-18, both
+  times from teammates' work on `develop`/`feature/product-api`) —
+  reconciled each time by merging `origin/main` into `developer-2`
+  (`0e30e3c`, then `8e295cf`). See "Branches" in `project_context.md`
+  for full detail. `developer-2` has local commits **not yet pushed**
+  as of this writing — check `git status` for the current count.

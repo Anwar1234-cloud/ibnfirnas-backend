@@ -5,6 +5,61 @@ reverse-chronological order. For the current architecture and defect
 status see [architecture.md](architecture.md); for v1 scope see
 [project_context.md](project_context.md).
 
+## 2026-07-18
+
+- **Merged `origin/main` into `developer-2`** (`8e295cf`), pulling in a
+  real test suite that landed there since the last sync: `AuthControllerTest`,
+  `AuthServiceTest`, `CartServiceTest`, `InquiryServiceTest`,
+  `OrderServiceTest`, `ProductServiceTest` — 36 tests total, all
+  passing. The only conflict was `AuthController.java`: `origin/main`
+  had independently added its own fix for the `/me` anonymous-crash bug
+  (an in-controller null check throwing `BadCredentialsException`,
+  caught by `GlobalExceptionHandler` → `401`) as part of a "Fix
+  controller and service tests with authentication fixes" commit.
+  Reconciled by keeping **both** fixes: the `SecurityConfig`
+  `.authenticated()` matchers from this branch (covers `/refresh-token`
+  too, which `origin/main`'s fix didn't touch) *and* the controller-level
+  null check from `origin/main`. Initially removed the null check as
+  "redundant" since `SecurityConfig` already blocks anonymous access —
+  but `AuthControllerTest` uses `@AutoConfigureMockMvc(addFilters =
+  false)` specifically to bypass the security filter chain and test the
+  controller in isolation, so the null check is the only thing that
+  makes that test pass. Restored it. Committed as `6c53de7` (the
+  `SecurityConfig` fix) + the merge commit `8e295cf`.
+- **Rebuilt the forgot-password flow around phone OTP, replacing the
+  email-token flow entirely** (a deliberate decision, not additive —
+  the old `POST /api/auth/forgot-password` no longer exists). Fixes the
+  email-enumeration issue that flow had (a distinguishable error for
+  unregistered emails on a public endpoint) — the new flow never
+  queries the `User` table until the final OTP-verified step, so there's
+  nothing to enumerate at the request stage. New shape: `POST
+  /api/otp/send {phone, purpose: "FORGOT_PASSWORD"}` to request a code,
+  then `POST /api/auth/reset-password {phone, otp, newPassword}` to
+  verify and reset in one call. Deleted the now-fully-dead
+  `PasswordResetToken` entity, `PasswordResetTokenRepository`,
+  `ForgotPasswordRequest` DTO, and `EmailService.sendPasswordResetEmail()`.
+  Also fixed the OTP `purpose` case-sensitivity bug while in there —
+  `/verify` now uppercases the input before parsing, same as `/send`
+  already did, so a lowercase `purpose` gets a clean `400` instead of a
+  raw `500`.
+- **Removed the email-OTP path entirely — OTP is phone/SMS-only now.**
+  `SendOtpRequest`/`VerifyOtpRequest` no longer have an `email` field.
+  Deleted the infrastructure that existed solely to support it:
+  `OtpVerification` entity, `OtpVerificationRepository`, `OtpType` enum,
+  `EmailService.sendOtpEmail()`. SMS OTP was always stateless (delegated
+  to Twilio Verify, no local DB tracking), so this doesn't change SMS
+  behavior at all — it just removes the unreachable email branch and
+  everything that only existed to support it.
+- **Contact form notification now goes to the admin, not the
+  submitter.** `ContactController` was calling
+  `emailService.sendInquiryConfirmation(request.getEmail(), ...)` —
+  confirmed this sent an auto-reply to whoever filled out the public
+  form, not a notification to anyone on the team. Now fetches
+  `Company.email` (the same field the public About/Contact screens
+  already use) and sends the submitter's name/email/phone/message
+  there via a new `EmailService.sendContactNotificationToAdmin()`.
+- Verified after each change: `mvn compile` clean, all 36 tests passing.
+
 ## 2026-07-17
 
 - **Fixed `JwtAuthenticationFilter` breaking `permitAll` endpoints when a
