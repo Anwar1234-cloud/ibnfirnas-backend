@@ -72,7 +72,7 @@ class AuthControllerTest {
     @DisplayName("POST /api/auth/register — success")
     void register_Returns200() throws Exception {
         RegisterRequest request = new RegisterRequest(
-                "Anwar Test", "anwar@test.com", "123456", "+974123");
+                "Anwar Test", "anwar@test.com", "123456", "+974123", "654321");
 
         AuthResponse authResponse = AuthResponse.builder()
                 .token("jwt_token")
@@ -98,7 +98,7 @@ class AuthControllerTest {
     @DisplayName("POST /api/auth/register — missing fields returns 400")
     void register_MissingFields_Returns400() throws Exception {
         RegisterRequest request = new RegisterRequest(
-                "", "", "", ""); // empty fields
+                "", "", "", "", ""); // empty fields
 
         mockMvc.perform(post("/api/auth/register")
                         .with(csrf())

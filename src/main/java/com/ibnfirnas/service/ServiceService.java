@@ -1,10 +1,13 @@
 package com.ibnfirnas.service;
 
 import com.ibnfirnas.dto.request.ServiceRequest; // Ye import zaroori hai
+import com.ibnfirnas.dto.response.PageResponse;
 import com.ibnfirnas.entity.ServiceEntity;
 import com.ibnfirnas.exception.ResourceNotFoundException;
 import com.ibnfirnas.repository.ServiceRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -12,10 +15,19 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ServiceService {
 
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final ServiceRepository serviceRepository;
 
-    public List<ServiceEntity> getAllServices() {
-        return serviceRepository.findByIsActiveTrue();
+    public PageResponse<ServiceEntity> getAllServices(int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), clampPageSize(size));
+        return PageResponse.from(serviceRepository.findByIsActiveTrue(pageable));
+    }
+
+    private int clampPageSize(int size) {
+        if (size < 1) return DEFAULT_PAGE_SIZE;
+        return Math.min(size, MAX_PAGE_SIZE);
     }
 
     public List<ServiceEntity> getFeaturedServices() {

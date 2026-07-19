@@ -35,6 +35,7 @@ class AuthServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtTokenProvider jwtTokenProvider;
     @Mock private AuthenticationManager authenticationManager;
+    @Mock private OtpService otpService;
 
     @InjectMocks private AuthService authService;
 
@@ -54,7 +55,7 @@ class AuthServiceTest {
                 .build();
 
         registerRequest = new RegisterRequest(
-                "Anwar Test", "anwar@test.com", "123456", "+97412345678");
+                "Anwar Test", "anwar@test.com", "123456", "+97412345678", "654321");
 
         loginRequest = new LoginRequest("anwar@test.com", "123456");
     }
@@ -65,6 +66,7 @@ class AuthServiceTest {
     @DisplayName("Register — success")
     void register_Success() {
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        when(otpService.verifySmsOtp(anyString(), anyString())).thenReturn(true);
         when(passwordEncoder.encode(anyString())).thenReturn("hashedPassword");
         when(userRepository.save(any(User.class))).thenReturn(mockUser);
         when(jwtTokenProvider.generateToken(anyString())).thenReturn("jwt_token");
@@ -78,6 +80,7 @@ class AuthServiceTest {
         assertEquals("anwar@test.com", response.getData().getEmail());
 
         verify(userRepository, times(1)).existsByEmail("anwar@test.com");
+        verify(otpService, times(1)).verifySmsOtp("+97412345678", "654321");
         verify(userRepository, times(1)).save(any(User.class));
         verify(jwtTokenProvider, times(1)).generateToken(anyString());
     }
@@ -92,6 +95,22 @@ class AuthServiceTest {
                 () -> authService.register(registerRequest));
 
         assertEquals("Email already registered", exception.getMessage());
+        verify(otpService, never()).verifySmsOtp(anyString(), anyString());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Register — invalid OTP")
+    void register_InvalidOtp_ThrowsException() {
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        when(otpService.verifySmsOtp(anyString(), anyString()))
+                .thenThrow(new BadRequestException("Invalid OTP"));
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> authService.register(registerRequest));
+
+        assertEquals("Invalid OTP", exception.getMessage());
         verify(userRepository, never()).save(any());
     }
 
@@ -99,6 +118,7 @@ class AuthServiceTest {
     @DisplayName("Register — password is encoded")
     void register_PasswordIsEncoded() {
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        when(otpService.verifySmsOtp(anyString(), anyString())).thenReturn(true);
         when(passwordEncoder.encode("123456")).thenReturn("hashedPassword");
         when(userRepository.save(any(User.class))).thenReturn(mockUser);
         when(jwtTokenProvider.generateToken(anyString())).thenReturn("token");

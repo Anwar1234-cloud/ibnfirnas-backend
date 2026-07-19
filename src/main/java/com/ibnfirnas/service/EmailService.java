@@ -1,6 +1,5 @@
 package com.ibnfirnas.service;
 
-import com.ibnfirnas.entity.enums.OtpPurpose;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,31 +17,15 @@ public class EmailService {
     @Value("${spring.mail.username:noreply@ibnfirnas.com}")
     private String fromEmail;
 
-    public void sendInquiryConfirmation(String toEmail, String name) {
-        sendEmail(toEmail,
-                "Inquiry Received - IBN Firnas",
-                "Dear " + name + ",\n\nThank you for your inquiry. " +
-                        "We will get back to you shortly.\n\nIBN Firnas Team");
-    }
-
-    public void sendOrderConfirmation(String toEmail, String orderNumber) {
-        sendEmail(toEmail,
-                "Order Confirmed - " + orderNumber,
-                "Your order " + orderNumber + " has been confirmed.\n\nIBN Firnas Team");
-    }
-
-    public void sendWelcomeEmail(String toEmail, String fullName) {
-        sendEmail(toEmail,
-                "Welcome to IBN Firnas!",
-                "Dear " + fullName + ",\n\nWelcome to IBN Firnas. " +
-                        "We are glad to have you.\n\nIBN Firnas Team");
-    }
-
-    public void sendPasswordResetEmail(String toEmail, String token) {
-        sendEmail(toEmail,
-                "Password Reset - IBN Firnas",
-                "Your password reset token is: " + token +
-                        "\n\nThis token expires in 1 hour.\n\nIBN Firnas Team");
+    public void sendContactNotificationToAdmin(String adminEmail, String name,
+            String submitterEmail, String phone, String message) {
+        sendEmail(adminEmail,
+                "New Contact Form Submission - IBN Firnas",
+                "New contact form submission:\n\n" +
+                        "Name: " + name + "\n" +
+                        "Email: " + submitterEmail + "\n" +
+                        "Phone: " + (phone == null || phone.isBlank() ? "-" : phone) + "\n\n" +
+                        "Message:\n" + message);
     }
 
     private void sendEmail(String to, String subject, String body) {
@@ -57,20 +40,5 @@ public class EmailService {
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage());
         }
-    }
-    public void sendOtpEmail(String toEmail, String otp, OtpPurpose purpose) {
-        String subject = switch (purpose) {
-            case REGISTRATION -> "IBN Firnas - Email Verification OTP";
-            case LOGIN -> "IBN Firnas - Login OTP";
-            case FORGOT_PASSWORD -> "IBN Firnas - Password Reset OTP";
-        };
-
-        String body = "Dear User,\n\n" +
-                "Your IBN Firnas OTP is: " + otp + "\n\n" +
-                "This OTP is valid for 10 minutes.\n" +
-                "Do not share this OTP with anyone.\n\n" +
-                "IBN Firnas Team";
-
-        sendEmail(toEmail, subject, body);
     }
 }

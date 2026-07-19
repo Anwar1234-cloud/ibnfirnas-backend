@@ -18,7 +18,9 @@ public class CloudinaryService {
 
     private final Cloudinary cloudinary;
 
-    public String uploadImage(MultipartFile file, String folder) {
+    public record UploadResult(String url, String publicId) {}
+
+    public UploadResult uploadImage(MultipartFile file, String folder) {
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new BadRequestException("Only image files are allowed");
@@ -34,20 +36,29 @@ public class CloudinaryService {
                             "fetch_format", "auto"
                     )
             );
-            return (String) uploadResult.get("secure_url");
+            return new UploadResult(
+                    (String) uploadResult.get("secure_url"),
+                    (String) uploadResult.get("public_id"));
         } catch (IOException e) {
             log.error("Cloudinary upload failed: {}", e.getMessage());
             throw new RuntimeException("Image upload failed");
         }
     }
 
-    public void deleteImage(String imageUrl) {
+    /** Preferred path when the public_id is already known (e.g. stored on the entity) — skips URL-parsing. */
+    public void deleteByPublicId(String publicId) {
         try {
-            String publicId = extractPublicId(imageUrl);
             cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
             log.info("Deleted image: {}", publicId);
         } catch (IOException e) {
             log.error("Cloudinary delete failed: {}", e.getMessage());
+        }
+    }
+
+    /** Fallback for callers that only have the URL (e.g. the generic delete-by-url upload endpoint). */
+    public void deleteImage(String imageUrl) {
+        try {
+            deleteByPublicId(extractPublicId(imageUrl));
         } catch (IllegalArgumentException e) {
             log.error("Cloudinary delete skipped, not a valid Cloudinary URL: {}", imageUrl);
         }

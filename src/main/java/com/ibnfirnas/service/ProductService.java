@@ -1,6 +1,7 @@
 package com.ibnfirnas.service;
 
 import com.ibnfirnas.dto.request.ProductRequest;
+import com.ibnfirnas.dto.response.PageResponse;
 import com.ibnfirnas.dto.response.ProductResponse;
 import com.ibnfirnas.entity.Category;
 import com.ibnfirnas.entity.Product;
@@ -9,6 +10,9 @@ import com.ibnfirnas.exception.ResourceNotFoundException;
 import com.ibnfirnas.repository.CategoryRepository;
 import com.ibnfirnas.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,6 +21,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ProductService {
+
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
@@ -91,10 +98,17 @@ public class ProductService {
     }
 
     // ============ CRUD ============
-    public List<ProductResponse> getAllProducts() {
-        return productRepository.findByIsActiveTrue()
-                .stream().map(this::toDTO)
-                .collect(Collectors.toList());
+    public PageResponse<ProductResponse> getAllProducts(int page, int size, Long categoryId) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), clampPageSize(size));
+        Page<Product> result = categoryId != null
+                ? productRepository.findByIsActiveTrueAndCategoryId(categoryId, pageable)
+                : productRepository.findByIsActiveTrue(pageable);
+        return PageResponse.from(result.map(this::toDTO));
+    }
+
+    private int clampPageSize(int size) {
+        if (size < 1) return DEFAULT_PAGE_SIZE;
+        return Math.min(size, MAX_PAGE_SIZE);
     }
 
     public ProductResponse getProductById(Long id) {
