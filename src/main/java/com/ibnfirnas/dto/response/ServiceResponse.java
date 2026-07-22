@@ -12,7 +12,7 @@ public class ServiceResponse {
     private String slug;
     private String description;
     private String shortDescription;
-    private String iconUrl;
+    private String imagePublicId;
     private String imageUrl;
     private Boolean isFeatured;
     private Integer displayOrder;

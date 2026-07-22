@@ -25,5 +25,6 @@ public class ProductResponse {
     private Double averageRating;
     private Integer totalReviews;
     private String primaryImageUrl;
+    private String primaryImagePublicId;
     private LocalDateTime createdAt;
 }
