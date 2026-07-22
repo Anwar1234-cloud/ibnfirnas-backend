@@ -1,6 +1,6 @@
 package com.ibnfirnas.service;
 
-import com.ibnfirnas.dto.request.ServiceRequest; // Ye import zaroori hai
+import com.ibnfirnas.dto.request.ServiceRequest;
 import com.ibnfirnas.dto.response.PageResponse;
 import com.ibnfirnas.entity.ServiceEntity;
 import com.ibnfirnas.exception.ResourceNotFoundException;
@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 @Service
@@ -44,29 +45,45 @@ public class ServiceService {
     }
 
     public ServiceEntity createService(ServiceRequest request) {
+
         ServiceEntity service = ServiceEntity.builder()
                 .name(request.getName())
                 .description(request.getDescription())
                 .shortDescription(request.getShortDescription())
-                .iconUrl(request.getIconUrl())
                 .imageUrl(request.getImageUrl())
+                .imagePublicId(request.getImagePublicId())
                 .isFeatured(request.getIsFeatured() != null ? request.getIsFeatured() : false)
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
-                .displayOrder(request.getDisplayOrder() != null ? request.getDisplayOrder() : 0)
                 .build();
+
         return serviceRepository.save(service);
     }
 
     public ServiceEntity updateService(Long id, ServiceRequest request) {
+
         ServiceEntity service = getServiceById(id);
-        if (request.getName() != null) service.setName(request.getName());
-        if (request.getDescription() != null) service.setDescription(request.getDescription());
-        if (request.getShortDescription() != null) service.setShortDescription(request.getShortDescription());
-        if (request.getIconUrl() != null) service.setIconUrl(request.getIconUrl());
-        if (request.getImageUrl() != null) service.setImageUrl(request.getImageUrl());
-        if (request.getIsFeatured() != null) service.setIsFeatured(request.getIsFeatured());
-        if (request.getIsActive() != null) service.setIsActive(request.getIsActive());
-        if (request.getDisplayOrder() != null) service.setDisplayOrder(request.getDisplayOrder());
+
+        if (request.getName() != null)
+            service.setName(request.getName());
+
+        if (request.getDescription() != null)
+            service.setDescription(request.getDescription());
+
+        if (request.getShortDescription() != null)
+            service.setShortDescription(request.getShortDescription());
+
+        if (request.getImageUrl() != null)
+            service.setImageUrl(request.getImageUrl());
+
+        if (request.getImagePublicId() != null)
+            service.setImagePublicId(request.getImagePublicId());
+
+        if (request.getIsFeatured() != null)
+            service.setIsFeatured(request.getIsFeatured());
+
+        if (request.getIsActive() != null)
+            service.setIsActive(request.getIsActive());
+
         return serviceRepository.save(service);
     }
 

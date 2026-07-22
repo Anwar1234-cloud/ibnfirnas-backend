@@ -12,8 +12,8 @@ public class ServiceRequest {
 
     private String description;
     private String shortDescription;
-    private String iconUrl;
     private String imageUrl;
+    private String imagePublicId;
     private Boolean isFeatured;
     private Boolean isActive;
     private Integer displayOrder;

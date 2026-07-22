@@ -89,4 +89,7 @@ public class Product {
     @Column(name = "primary_image_url")
     private String primaryImageUrl;
 
+    @Column(name = "primary_image_public_id")
+    private String primaryImagePublicId;
+
 }

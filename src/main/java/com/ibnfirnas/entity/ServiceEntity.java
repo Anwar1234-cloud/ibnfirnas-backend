@@ -30,8 +30,8 @@ public class ServiceEntity {
     @Column(name = "short_description")
     private String shortDescription;
 
-    @Column(name = "icon_url")
-    private String iconUrl;
+    @Column(name ="image_publicId" )
+    private String imagePublicId;
 
     @Column(name = "image_url")
     private String imageUrl;

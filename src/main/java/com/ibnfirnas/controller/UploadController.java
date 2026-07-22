@@ -1,13 +1,12 @@
 package com.ibnfirnas.controller;
 
 import com.ibnfirnas.dto.response.ApiResponse;
+import com.ibnfirnas.dto.response.UploadResponse;
 import com.ibnfirnas.service.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/upload")
@@ -17,7 +16,7 @@ public class UploadController {
     private final CloudinaryService cloudinaryService;
 
     @PostMapping("/image")
-    public ResponseEntity<ApiResponse<Map<String, String>>> uploadImage(
+    public ResponseEntity<ApiResponse<UploadResponse>> uploadImage(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "folder", defaultValue = "general") String folder) {
 
@@ -26,16 +25,24 @@ public class UploadController {
                     .body(ApiResponse.error("File is empty"));
         }
 
-        CloudinaryService.UploadResult result = cloudinaryService.uploadImage(file, folder);
+        UploadResponse response = cloudinaryService.uploadImage(file, folder);
+
         return ResponseEntity.ok(
-                ApiResponse.success("Image uploaded successfully",
-                        Map.of("url", result.url(), "publicId", result.publicId())));
+                ApiResponse.success(
+                        "Image uploaded successfully",
+                        response
+                )
+        );
     }
 
     @DeleteMapping("/image")
     public ResponseEntity<ApiResponse<Void>> deleteImage(
-            @RequestParam("url") String imageUrl) {
-        cloudinaryService.deleteImage(imageUrl);
-        return ResponseEntity.ok(ApiResponse.success("Image deleted", null));
+            @RequestParam("publicId") String publicId) {
+
+        cloudinaryService.deleteImage(publicId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("Image deleted", null)
+        );
     }
 }
