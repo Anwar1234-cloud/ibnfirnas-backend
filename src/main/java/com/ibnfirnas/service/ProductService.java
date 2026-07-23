@@ -65,6 +65,7 @@ public class ProductService {
                 .averageRating(product.getAverageRating())
                 .totalReviews(product.getTotalReviews())
                 .primaryImageUrl(primaryImageUrl)
+                .specifications(product.getSpecifications())
                 .createdAt(product.getCreatedAt())
                 .build();
     }
@@ -94,6 +95,7 @@ public class ProductService {
                         ? request.getIsActive() : true)
                 .category(category)
                 .primaryImageUrl(request.getPrimaryImageUrl())
+                .specifications(request.getSpecifications())
                 .build();
     }
 
@@ -149,6 +151,8 @@ public class ProductService {
             product.setIsFeatured(request.getIsFeatured());
         if (request.getPrimaryImageUrl() != null)
             product.setPrimaryImageUrl(request.getPrimaryImageUrl());
+        if (request.getSpecifications() != null)
+            product.setSpecifications(request.getSpecifications());
 
         if (request.getIsActive() != null)
             product.setIsActive(request.getIsActive());
