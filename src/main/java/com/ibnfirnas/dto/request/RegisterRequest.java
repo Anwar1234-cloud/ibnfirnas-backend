@@ -20,5 +20,9 @@ public class RegisterRequest {
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
 
+    @NotBlank(message = "Phone is required")
     private String phone;
+
+    @NotBlank(message = "OTP is required")
+    private String otp;
 }

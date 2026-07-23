@@ -1,6 +1,7 @@
 package com.ibnfirnas.service;
 
 import com.ibnfirnas.dto.request.ProductRequest;
+import com.ibnfirnas.dto.response.PageResponse;
 import com.ibnfirnas.dto.response.ProductResponse;
 import com.ibnfirnas.entity.Product;
 import com.ibnfirnas.exception.ResourceNotFoundException;
@@ -13,6 +14,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -59,26 +63,27 @@ class ProductServiceTest {
     @Test
     @DisplayName("Get all active products — success")
     void getAllProducts_Success() {
-        when(productRepository.findByIsActiveTrue())
-                .thenReturn(Arrays.asList(mockProduct));
+        when(productRepository.findByIsActiveTrue(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Arrays.asList(mockProduct)));
 
-        List<ProductResponse> products = productService.getAllProducts();
+        PageResponse<ProductResponse> products = productService.getAllProducts(0, 20, null);
 
         assertNotNull(products);
-        assertEquals(1, products.size());
-        assertEquals("Automatic Sliding Gate", products.get(0).getName());
-        verify(productRepository, times(1)).findByIsActiveTrue();
+        assertEquals(1, products.getContent().size());
+        assertEquals("Automatic Sliding Gate", products.getContent().get(0).getName());
+        verify(productRepository, times(1)).findByIsActiveTrue(any(Pageable.class));
     }
 
     @Test
     @DisplayName("Get all products — empty list")
     void getAllProducts_EmptyList() {
-        when(productRepository.findByIsActiveTrue()).thenReturn(List.of());
+        when(productRepository.findByIsActiveTrue(any(Pageable.class)))
+                .thenReturn(Page.empty());
 
-        List<ProductResponse> products = productService.getAllProducts();
+        PageResponse<ProductResponse> products = productService.getAllProducts(0, 20, null);
 
         assertNotNull(products);
-        assertTrue(products.isEmpty());
+        assertTrue(products.getContent().isEmpty());
     }
 
     @Test

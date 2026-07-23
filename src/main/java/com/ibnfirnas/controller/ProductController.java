@@ -2,6 +2,7 @@ package com.ibnfirnas.controller;
 
 import com.ibnfirnas.dto.request.ProductRequest;
 import com.ibnfirnas.dto.response.ApiResponse;
+import com.ibnfirnas.dto.response.PageResponse;
 import com.ibnfirnas.dto.response.ProductResponse;
 import com.ibnfirnas.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -18,9 +19,12 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllProducts() {
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getAllProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Long categoryId) {
         return ResponseEntity.ok(ApiResponse.success("Products fetched",
-                productService.getAllProducts()));
+                productService.getAllProducts(page, size, categoryId)));
     }
 
     @GetMapping("/{id}")

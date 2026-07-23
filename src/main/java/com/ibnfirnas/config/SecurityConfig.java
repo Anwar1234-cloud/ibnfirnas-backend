@@ -1,7 +1,10 @@
 package com.ibnfirnas.config;
 
 import com.ibnfirnas.security.JwtAuthenticationFilter;
+import com.ibnfirnas.security.RestAccessDeniedHandler;
+import com.ibnfirnas.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,6 +21,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -27,6 +31,11 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
+
+    @Value("${cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -35,8 +44,19 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // /me and /refresh-token need a valid token — carved out
+                        // of the blanket permitAll below so an anonymous call is
+                        // rejected by Spring Security itself (clean 401 via
+                        // RestAuthenticationEntryPoint) instead of reaching the
+                        // controller and NPE-ing on a null @AuthenticationPrincipal.
+                        .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/refresh-token").authenticated()
                         .requestMatchers("/api/auth/**").permitAll()
 
                         // Public catalog/content reads; writes are admin-only.
@@ -53,7 +73,6 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/upload/**").hasRole("ADMIN")
 
-                        .requestMatchers("/api/newsletter/**").permitAll()
                         .requestMatchers("/api/contact/**").permitAll()
                         .requestMatchers("/api/reviews/product/**").permitAll()
 
@@ -71,6 +90,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/inquiries/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/inquiries/**").hasRole("ADMIN")
                         .requestMatchers("/api/orders/all").hasRole("ADMIN")
+
+                        // Notification is an admin-only broadcast tool, not a
+                        // public/user-readable resource like Product/Gallery/etc.
+                        // — every method, including GET, is admin-only. Previously
+                        // had no matcher at all here and fell through to the
+                        // anyRequest().authenticated() catch-all below, letting
+                        // any logged-in user (any role) list notifications and
+                        // leak the creating admin's password hash via the raw
+                        // entity response (now fixed separately with a
+                        // NotificationResponse DTO in NotificationController).
+                        .requestMatchers("/api/notifications/**").hasRole("ADMIN")
+
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/otp/**").permitAll()
                         .anyRequest().authenticated()
@@ -84,7 +115,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.setAllowedOrigins(List.of("http://localhost:5173" ));
+        config.setAllowedOriginPatterns(Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList());
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS","PATCH"));
         config.setMaxAge(3600L);
