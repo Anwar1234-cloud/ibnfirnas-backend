@@ -103,7 +103,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/notifications/**").hasRole("ADMIN")
 
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/otp/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter,
@@ -137,4 +136,6 @@ public class SecurityConfig {
             AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
+
+
 }
