@@ -2,6 +2,7 @@ package com.ibnfirnas.controller;
 
 import com.ibnfirnas.dto.request.GoogleAuthRequest;
 import com.ibnfirnas.dto.request.LoginRequest;
+import com.ibnfirnas.dto.request.RegisterRequest;
 import com.ibnfirnas.dto.response.ApiResponse;
 import com.ibnfirnas.dto.response.AuthResponse;
 import com.ibnfirnas.dto.response.RefreshTokenResponse;
@@ -30,6 +31,13 @@ public class AuthController {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
 
+
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<AuthResponse>> register(
+            @Valid @RequestBody RegisterRequest request) {
+
+        return ResponseEntity.ok(authService.register(request));
+    }
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
