@@ -70,6 +70,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/gallery/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/company/**").permitAll()
                         .requestMatchers("/api/company/**").hasRole("ADMIN")
+
                         .requestMatchers("/api/upload/**").hasRole("ADMIN")
 
                         .requestMatchers("/api/contact/**").permitAll()
@@ -102,7 +103,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/notifications/**").hasRole("ADMIN")
 
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/otp/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter,
@@ -136,4 +136,6 @@ public class SecurityConfig {
             AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
+
+
 }

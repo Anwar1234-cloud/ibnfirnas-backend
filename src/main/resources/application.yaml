@@ -86,8 +86,6 @@ cloudinary:
   api-secret: ${CLOUDINARY_API_SECRET}
 
 
-#Twilio Account
-twilio:
-  account-sid: ${TWILIO_ACCOUNT_SID}
-  auth-token: ${TWILIO_AUTH_TOKEN}
-  verify-service-sid: ${TWILIO_VERIFY_SERVICE_SID}
+# Google
+google:
+  client-id: 282521229458-p7dk39mknn8dsc628bdc0q4qt6ba07bf.apps.googleusercontent.com

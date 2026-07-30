@@ -34,6 +34,8 @@ public class Company {
     @Column(name = "banner_url")
     private String bannerUrl;
 
+
+
     private String phone;
     private String email;
 

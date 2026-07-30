@@ -3,26 +3,21 @@ package com.ibnfirnas.dto.request;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.*;
+import lombok.Data;
 
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
+@Data
 public class RegisterRequest {
 
-    @NotBlank(message = "Full name is required")
+    @NotBlank
     private String fullName;
 
-    @NotBlank(message = "Email is required")
-    @Email(message = "Invalid email format")
+    @Email
+    @NotBlank
     private String email;
 
-    @NotBlank(message = "Password is required")
-    @Size(min = 6, message = "Password must be at least 6 characters")
+    @NotBlank
+    @Size(min = 6)
     private String password;
 
-    @NotBlank(message = "Phone is required")
     private String phone;
-
-    @NotBlank(message = "OTP is required")
-    private String otp;
 }

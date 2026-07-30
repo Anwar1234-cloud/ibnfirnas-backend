@@ -1,7 +1,6 @@
 package com.ibnfirnas.service;
 
 import com.ibnfirnas.dto.request.LoginRequest;
-import com.ibnfirnas.dto.request.RegisterRequest;
 import com.ibnfirnas.dto.response.ApiResponse;
 import com.ibnfirnas.dto.response.AuthResponse;
 import com.ibnfirnas.entity.User;
@@ -18,7 +17,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;

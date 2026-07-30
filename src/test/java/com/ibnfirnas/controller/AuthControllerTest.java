@@ -1,13 +1,10 @@
 package com.ibnfirnas.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ibnfirnas.config.SecurityConfig;
 import com.ibnfirnas.dto.request.LoginRequest;
-import com.ibnfirnas.dto.request.RegisterRequest;
 import com.ibnfirnas.dto.response.ApiResponse;
 import com.ibnfirnas.dto.response.AuthResponse;
 import com.ibnfirnas.service.AuthService;
-import com.ibnfirnas.service.PasswordResetService;
 import com.ibnfirnas.security.JwtTokenProvider;
 import com.ibnfirnas.repository.UserRepository;
 import jakarta.servlet.FilterChain;
@@ -22,7 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -54,6 +50,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private CustomUserDetailsService customUserDetailsService;
+
+    @MockitoBean
+    private CustomUserDetailsService userDetailsService;
 
     @BeforeEach
     void setup() throws Exception {
