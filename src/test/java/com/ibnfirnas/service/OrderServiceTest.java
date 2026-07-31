@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -128,6 +129,37 @@ class OrderServiceTest {
         when(orderRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-                () -> orderService.getOrderById(999L));
+                () -> orderService.getOrderById(999L, "anwar@test.com", false));
+    }
+
+    @Test
+    @DisplayName("Get order by ID — owner can view their own order")
+    void getOrderById_Owner_Success() {
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        OrderResponse response = orderService.getOrderById(1L, "anwar@test.com", false);
+
+        assertNotNull(response);
+        assertEquals("IBN-ABC123", response.getOrderNumber());
+    }
+
+    @Test
+    @DisplayName("Get order by ID — non-owner is denied (IDOR fix)")
+    void getOrderById_NonOwner_ThrowsAccessDenied() {
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        assertThrows(AccessDeniedException.class,
+                () -> orderService.getOrderById(1L, "someoneelse@test.com", false));
+    }
+
+    @Test
+    @DisplayName("Get order by ID — admin can view any order")
+    void getOrderById_Admin_CanViewAnyOrder() {
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        OrderResponse response = orderService.getOrderById(1L, "admin@test.com", true);
+
+        assertNotNull(response);
+        assertEquals("IBN-ABC123", response.getOrderNumber());
     }
 }
