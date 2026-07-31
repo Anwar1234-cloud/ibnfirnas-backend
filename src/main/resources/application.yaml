@@ -16,7 +16,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     open-in-view: false
     properties:
       hibernate:
@@ -71,11 +71,10 @@ springdoc:
 # Logging
 logging:
   level:
-    com.ibnfirnas: DEBUG
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
-    org.hibernate.engine.transaction: TRACE
+    com.ibnfirnas: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+
 
 
 # Cloudinary
@@ -88,4 +87,4 @@ cloudinary:
 
 # Google
 google:
-  client-id: 282521229458-p7dk39mknn8dsc628bdc0q4qt6ba07bf.apps.googleusercontent.com
+  client-id: ${GOOGLE_CLIENT_ID:282521229458-p7dk39mknn8dsc628bdc0q4qt6ba07bf.apps.googleusercontent.com}
