@@ -3,6 +3,7 @@ package com.ibnfirnas.dto.response;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
@@ -25,6 +26,6 @@ public class ProductResponse {
     private Double averageRating;
     private Integer totalReviews;
     private String primaryImageUrl;
-    private String primaryImagePublicId;
+    private Map<String, String> specifications;
     private LocalDateTime createdAt;
 }

@@ -20,7 +20,6 @@ public class DashboardService {
     private final ServiceRepository serviceRepository;
     private final GalleryRepository galleryRepository;
 
-
     public Map<String, Object> getStats() {
         Map<String, Object> stats = new HashMap<>();
 
@@ -31,7 +30,6 @@ public class DashboardService {
         stats.put("totalInquiries", inquiryRepository.count());
         stats.put("totalServices", serviceRepository.count());
         stats.put("totalGallery", galleryRepository.count());
-
 
         // Order breakdown
         stats.put("pendingOrders", orderRepository

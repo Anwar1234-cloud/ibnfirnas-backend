@@ -35,12 +35,6 @@ public class Category {
 
     private String description;
 
-    @Column(name = "icon_url")
-    private String iconUrl;
-
-    @Column(name = "image_url")
-    private String imageUrl;
-
     @Column(name = "display_order")
     private Integer displayOrder;
 

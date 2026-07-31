@@ -28,6 +28,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
 
+    // ============ toDTO ============
     public ProductResponse toDTO(Product product) {
         if (product == null) return null;
 
@@ -57,20 +58,23 @@ public class ProductService {
                 .stockStatus(product.getStockStatus())
                 .isFeatured(product.getIsFeatured())
                 .isActive(product.getIsActive())
-                .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
-                .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
+                .categoryId(product.getCategory() != null
+                        ? product.getCategory().getId() : null)
+                .categoryName(product.getCategory() != null
+                        ? product.getCategory().getName() : null)
                 .averageRating(product.getAverageRating())
                 .totalReviews(product.getTotalReviews())
                 .primaryImageUrl(primaryImageUrl)
-                .primaryImagePublicId(product.getPrimaryImagePublicId())
+                .specifications(product.getSpecifications())
                 .createdAt(product.getCreatedAt())
                 .build();
     }
 
+    // ============ toEntity ============
     public Product toEntity(ProductRequest request) {
+        if (request == null) return null;
 
         Category category = null;
-
         if (request.getCategoryId() != null) {
             category = categoryRepository.findById(request.getCategoryId())
                     .orElse(null);
@@ -83,24 +87,24 @@ public class ProductService {
                 .price(request.getPrice())
                 .discountPrice(request.getDiscountPrice())
                 .sku(request.getSku())
-                .stockQuantity(request.getStockQuantity() == null ? 0 : request.getStockQuantity())
-                .isFeatured(request.getIsFeatured() == null ? false : request.getIsFeatured())
-                .isActive(request.getIsActive() == null ? true : request.getIsActive())
+                .stockQuantity(request.getStockQuantity() != null
+                        ? request.getStockQuantity() : 0)
+                .isFeatured(request.getIsFeatured() != null
+                        ? request.getIsFeatured() : false)
+                .isActive(request.getIsActive() != null
+                        ? request.getIsActive() : true)
                 .category(category)
                 .primaryImageUrl(request.getPrimaryImageUrl())
-                .primaryImagePublicId(request.getPrimaryImagePublicId())
+                .specifications(request.getSpecifications())
                 .build();
     }
 
-
+    // ============ CRUD ============
     public PageResponse<ProductResponse> getAllProducts(int page, int size, Long categoryId) {
-
         Pageable pageable = PageRequest.of(Math.max(page, 0), clampPageSize(size));
-
         Page<Product> result = categoryId != null
                 ? productRepository.findByIsActiveTrueAndCategoryId(categoryId, pageable)
                 : productRepository.findByIsActiveTrue(pageable);
-
         return PageResponse.from(result.map(this::toDTO));
     }
 
@@ -109,70 +113,49 @@ public class ProductService {
         return Math.min(size, MAX_PAGE_SIZE);
     }
 
-
-
     public ProductResponse getProductById(Long id) {
-
         Product product = productRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Product not found with id: " + id));
-
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Product not found with id: " + id));
         return toDTO(product);
     }
 
     public List<ProductResponse> getFeaturedProducts() {
         return productRepository.findByIsFeaturedTrue()
-                .stream()
-                .map(this::toDTO)
+                .stream().map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
     public ProductResponse createProduct(ProductRequest request) {
-
         Product product = toEntity(request);
-
         return toDTO(productRepository.save(product));
     }
 
     public ProductResponse updateProduct(Long id, ProductRequest request) {
-
         Product product = productRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Product not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Product not found with id: " + id));
 
-        if (request.getName() != null)
-            product.setName(request.getName());
-
+        if (request.getName() != null) product.setName(request.getName());
         if (request.getDescription() != null)
             product.setDescription(request.getDescription());
-
         if (request.getShortDescription() != null)
             product.setShortDescription(request.getShortDescription());
-
-        if (request.getPrice() != null)
-            product.setPrice(request.getPrice());
-
+        if (request.getPrice() != null) product.setPrice(request.getPrice());
         if (request.getDiscountPrice() != null)
             product.setDiscountPrice(request.getDiscountPrice());
-
-        if (request.getSku() != null)
-            product.setSku(request.getSku());
-
+        if (request.getSku() != null) product.setSku(request.getSku());
         if (request.getStockQuantity() != null)
             product.setStockQuantity(request.getStockQuantity());
-
         if (request.getIsFeatured() != null)
             product.setIsFeatured(request.getIsFeatured());
+        if (request.getPrimaryImageUrl() != null)
+            product.setPrimaryImageUrl(request.getPrimaryImageUrl());
+        if (request.getSpecifications() != null)
+            product.setSpecifications(request.getSpecifications());
 
         if (request.getIsActive() != null)
             product.setIsActive(request.getIsActive());
-
-        if (request.getPrimaryImageUrl() != null)
-            product.setPrimaryImageUrl(request.getPrimaryImageUrl());
-
-        if (request.getPrimaryImagePublicId() != null)
-            product.setPrimaryImagePublicId(request.getPrimaryImagePublicId());
-
         if (request.getCategoryId() != null) {
             categoryRepository.findById(request.getCategoryId())
                     .ifPresent(product::setCategory);
@@ -182,13 +165,12 @@ public class ProductService {
     }
 
     public void deleteProduct(Long id) {
-
         Product product = productRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Product not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+
 
         product.setIsActive(false);
-
         productRepository.save(product);
     }
+
 }
