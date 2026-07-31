@@ -2,9 +2,11 @@ package com.ibnfirnas.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ibnfirnas.dto.request.LoginRequest;
+import com.ibnfirnas.dto.request.RegisterRequest;
 import com.ibnfirnas.dto.response.ApiResponse;
 import com.ibnfirnas.dto.response.AuthResponse;
 import com.ibnfirnas.service.AuthService;
+import com.ibnfirnas.service.GoogleAuthService;
 import com.ibnfirnas.security.JwtTokenProvider;
 import com.ibnfirnas.repository.UserRepository;
 import jakarta.servlet.FilterChain;
@@ -41,7 +43,7 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
-    @MockitoBean private PasswordResetService passwordResetService;
+    @MockitoBean private GoogleAuthService googleAuthService;
     @MockitoBean private JwtTokenProvider jwtTokenProvider;
     @MockitoBean private UserRepository userRepository;
 
@@ -50,9 +52,6 @@ class AuthControllerTest {
 
     @MockitoBean
     private CustomUserDetailsService customUserDetailsService;
-
-    @MockitoBean
-    private CustomUserDetailsService userDetailsService;
 
     @BeforeEach
     void setup() throws Exception {
@@ -70,8 +69,11 @@ class AuthControllerTest {
     @Test
     @DisplayName("POST /api/auth/register — success")
     void register_Returns200() throws Exception {
-        RegisterRequest request = new RegisterRequest(
-                "Anwar Test", "anwar@test.com", "123456", "+974123", "654321");
+        RegisterRequest request = new RegisterRequest();
+        request.setFullName("Anwar Test");
+        request.setEmail("anwar@test.com");
+        request.setPassword("123456");
+        request.setPhone("+974123");
 
         AuthResponse authResponse = AuthResponse.builder()
                 .token("jwt_token")
@@ -96,8 +98,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("POST /api/auth/register — missing fields returns 400")
     void register_MissingFields_Returns400() throws Exception {
-        RegisterRequest request = new RegisterRequest(
-                "", "", "", "", ""); // empty fields
+        RegisterRequest request = new RegisterRequest(); // all fields blank
 
         mockMvc.perform(post("/api/auth/register")
                         .with(csrf())
