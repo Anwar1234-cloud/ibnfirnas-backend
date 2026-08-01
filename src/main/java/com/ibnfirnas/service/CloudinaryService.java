@@ -62,6 +62,20 @@ public class CloudinaryService {
         }
     }
 
+    /** Fallback for callers that only have the URL (e.g. Gallery rows predating the cloudinaryPublicId column). */
+    public String extractPublicId(String imageUrl) {
+        int uploadIndex = imageUrl.indexOf("/upload/");
+        if (uploadIndex == -1) {
+            throw new IllegalArgumentException("Not a valid Cloudinary URL: " + imageUrl);
+        }
+        String afterUpload = imageUrl.substring(uploadIndex + "/upload/".length());
+        // Strip an optional version segment, e.g. "v1690000000/"
+        afterUpload = afterUpload.replaceFirst("^v\\d+/", "");
+        // Strip the file extension
+        int lastDot = afterUpload.lastIndexOf('.');
+        return lastDot == -1 ? afterUpload : afterUpload.substring(0, lastDot);
+    }
+
     // Backward compatibility
     public void deleteImage(String publicId) {
         deleteByPublicId(publicId);

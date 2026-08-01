@@ -15,12 +15,24 @@ spring:
   # JPA / Hibernate
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
     open-in-view: false
     properties:
       hibernate:
         format_sql: true
+
+  # Flyway — replaces ddl-auto:update as the schema-change mechanism.
+  # baseline-on-migrate + baseline-version: 1 lets Flyway attach to an
+  # existing database (like local dev, already at V1's schema) without
+  # re-running V1's SQL — it just records V1 as already-applied and runs
+  # anything after it. A genuinely fresh database (e.g. a new prod DB)
+  # runs every migration from V1 onward for real.
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
 
   # DevTools
   devtools:
@@ -71,11 +83,10 @@ springdoc:
 # Logging
 logging:
   level:
-    com.ibnfirnas: DEBUG
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
-    org.hibernate.engine.transaction: TRACE
+    com.ibnfirnas: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+
 
 
 # Cloudinary
@@ -88,4 +99,12 @@ cloudinary:
 
 # Google
 google:
-  client-id: 282521229458-p7dk39mknn8dsc628bdc0q4qt6ba07bf.apps.googleusercontent.com
+  client-id: ${GOOGLE_CLIENT_ID:282521229458-p7dk39mknn8dsc628bdc0q4qt6ba07bf.apps.googleusercontent.com}
+
+# Admin bootstrap — optional, one-time. Set both to auto-provision the first
+# ROLE_ADMIN account on startup. No-op if unset or if the account already
+# exists. See AdminBootstrapRunner.
+admin:
+  bootstrap:
+    email: ${ADMIN_BOOTSTRAP_EMAIL:}
+    password: ${ADMIN_BOOTSTRAP_PASSWORD:}
