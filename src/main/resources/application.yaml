@@ -1,6 +1,4 @@
-spring:
-
-  management:
+management:
     endpoints:
       web:
         exposure:
@@ -8,6 +6,8 @@ spring:
     health:
       mail:
         enabled: false
+
+spring:
 
   config:
     import: optional:file:.env[.properties]
