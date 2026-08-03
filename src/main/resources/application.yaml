@@ -5,6 +5,9 @@ spring:
       web:
         exposure:
           include: health
+    health:
+      mail:
+        enabled: false
 
   config:
     import: optional:file:.env[.properties]
