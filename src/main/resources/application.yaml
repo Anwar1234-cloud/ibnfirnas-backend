@@ -1,6 +1,4 @@
-
-
-  management:
+management:
     endpoints:
       web:
         exposure:
@@ -8,6 +6,7 @@
     health:
       mail:
         enabled: false
+
 spring:
 
   config:
