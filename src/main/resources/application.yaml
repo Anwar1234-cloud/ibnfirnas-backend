@@ -1,4 +1,11 @@
 spring:
+
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health
+
   config:
     import: optional:file:.env[.properties]
 
