@@ -39,9 +39,12 @@ public class OrderController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<OrderResponse>> getOrder(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
         return ResponseEntity.ok(ApiResponse.success("Order fetched",
-                orderService.getOrderById(id)));
+                orderService.getOrderById(id, userDetails.getUsername(), isAdmin)));
     }
 
     @PutMapping("/{id}/status")

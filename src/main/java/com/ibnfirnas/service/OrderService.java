@@ -7,6 +7,7 @@ import com.ibnfirnas.entity.enums.OrderStatus;
 import com.ibnfirnas.exception.ResourceNotFoundException;
 import com.ibnfirnas.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -125,10 +126,15 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
-    public OrderResponse getOrderById(Long id) {
+    public OrderResponse getOrderById(Long id, String requesterEmail, boolean isAdmin) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Order not found with id: " + id));
+        boolean isOwner = order.getUser() != null
+                && order.getUser().getEmail().equals(requesterEmail);
+        if (!isAdmin && !isOwner) {
+            throw new AccessDeniedException("You do not have permission to view this order");
+        }
         return toDTO(order);
     }
 

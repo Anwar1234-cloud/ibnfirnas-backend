@@ -64,7 +64,13 @@ public class GalleryController {
         if (gallery.getCloudinaryPublicId() != null && !gallery.getCloudinaryPublicId().isBlank()) {
             cloudinaryService.deleteByPublicId(gallery.getCloudinaryPublicId());
         } else if (gallery.getMediaUrl() != null) {
-            cloudinaryService.deleteImage(gallery.getMediaUrl());
+            try {
+                String publicId = cloudinaryService.extractPublicId(gallery.getMediaUrl());
+                cloudinaryService.deleteByPublicId(publicId);
+            } catch (IllegalArgumentException e) {
+                // mediaUrl wasn't a Cloudinary URL we could parse — skip cleanup,
+                // still let the DB row get deleted below
+            }
         }
         galleryRepository.deleteById(id);
         return ResponseEntity.ok(ApiResponse.success("Deleted", null));
